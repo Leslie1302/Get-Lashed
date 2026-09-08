@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>lashes-debug — FaceLandmarker lash-line fill</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #wrap { position: relative; width: 100%; height: 100%; }
+  video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #hud { position: absolute; top: 10px; left: 10px; z-index: 5; font: 13px/1.5 monospace;
+         color: #0f0; background: rgba(0,0,0,.55); padding: 6px 10px; border-radius: 6px; white-space: pre; }
+  button { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 5;
+           font: 13px system-ui; padding: 8px 12px; border-radius: 8px; border: 1px solid #444;
+           background: rgba(20,20,20,.85); color: #eee; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <video id="cam" autoplay playsinline muted></video>
+  <canvas id="overlay"></canvas>
+  <div id="hud">loading…</div>
+  <button id="btnCam">front camera</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js"
+        crossorigin="anonymous"></script>
+<script>
+"use strict";
+
+const video = document.getElementById("cam");
+const canvas = document.getElementById("overlay");
+const ctx = canvas.getContext("2d");
+const hud = document.getElementById("hud");
+
+// Face Mesh eye contour landmark index lists.
+const EYES = [
+  [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246],
+  [263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466]
+];
+
+let faceLandmarker = null;
+let facing = "user";
+let stream = null;
+
+const hudStats = { fps: 0, face: false };
+let frames = 0, lastFpsTs = performance.now();
+
+(async () => {
+  const fileset = await vision.FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+  );
+  faceLandmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
+    baseOptions: {
+      modelAssetPath:
+        "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+      delegate: "GPU"
+    },
+    runningMode: "VIDEO",
+    numFaces: 1
+  });
+  hud.textContent = "model loaded — start camera";
+})();
+
+async function startCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facing }, width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false
+    });
+  } catch (err) {
+    hud.textContent = "camera error: " + err.message;
+    return;
+  }
+  video.srcObject = stream;
+  await video.play();
+  video.requestVideoFrameCallback(function step() {
+    process();
+    video.requestVideoFrameCallback(step);
+  });
+}
+
+function process() {
+  const ts = performance.now();
+  frames++;
+  if (ts - lastFpsTs >= 1000) {
+    hudStats.fps = Math.round((frames * 1000) / (ts - lastFpsTs));
+    frames = 0;
+    lastFpsTs = ts;
+  }
+  if (!faceLandmarker) return;
+
+  const w = video.videoWidth || 0, h = video.videoHeight || 0;
+  if (!w || !h) return;
+  if (canvas.width !== w) { canvas.width = w; canvas.height = h; }
+  ctx.clearRect(0, 0, w, h);
+
+  const res = faceLandmarker.detectForVideo(video, ts);
+  hudStats.face = !!(res.faceLandmarks && res.faceLandmarks.length);
+
+  for (const face of (res.faceLandmarks || [])) {
+    const pts = face.map(p => [p.x * w, p.y * h]);
+    for (const outline of EYES) {
+      const arc = outline.map(i => pts[i]).some(p => !p) ? [] : outline.map(i => pts[i]);
+      fillLashBand(arc);
+    }
+  }
+
+  hud.textContent =
+    "fps " + hudStats.fps + "\n" +
+    "face " + hudStats.face + "\n" +
+    "(FaceLandmarker exposes no per-landmark confidence)";
+}
+
+/**
+ * Fill the crescent between the upper lid fold and an offset lash line.
+ * upper points are those above the eye centre; each is pushed outward along
+ * the radial direction from the eye centre, more in mid-eye (feathered tips).
+ */
+function fillLashBand(outline) {
+  if (outline.length < 6) return;
+
+  let cx = 0, cy = 0;
+  for (const [x, y] of outline) { cx += x; cy += y; }
+  cx /= outline.length; cy /= outline.length;
+
+  const upper = outline.filter(p => p[1] < cy).sort((a, b) => a[0] - b[0]);
+  if (upper.length < 3) return;
+
+  let minX = Infinity, maxX = -Infinity;
+  for (const [x] of outline) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
+  const eyeW = maxX - minX;
+  if (eyeW < 16) return; // face too small / side-on
+
+  const lashLen = Math.max(4, eyeW * 0.14);
+  const n = upper.length;
+
+  // Outer boundary: upper points pushed outward (up).
+  const outers = upper.map((p, i) => {
+    const t = n === 1 ? 1 : i / (n - 1);
+    const taper = Math.min(t, 1 - t) * 2; // 0 at corners -> 1 mid-eye
+    const d = Math.hypot(p[0] - cx, p[1] - cy) || 1;
+    const o = lashLen * (0.3 + 0.7 * taper);
+    return [p[0] + ((p[0] - cx) / d) * o, p[1] + ((p[1] - cy) / d) * o];
+  });
+
+  // Fill the band: outer arc out, inner arc back along the lid line.
+  ctx.beginPath();
+  ctx.moveTo(outers[0][0], outers[0][1]);
+  for (let i = 1; i < n; i++) ctx.lineTo(outers[i][0], outers[i][1]);
+  for (let i = n - 1; i >= 0; i--) ctx.lineTo(upper[i][0], upper[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(20,16,14,.92)";
+  ctx.fill();
+
+  // Outline the lash line itself so tracking errors are visible.
+  ctx.beginPath();
+  ctx.moveTo(upper[0][0], upper[0][1]);
+  for (let i = 1; i < n; i++) ctx.lineTo(upper[i][0], upper[i][1]);
+  ctx.strokeStyle = "rgba(255,0,0,.8)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+document.getElementById("btnCam").addEventListener("click", () => {
+  facing = facing === "user" ? "environment" : "user";
+  document.getElementById("btnCam").textContent = facing + " camera";
+  startCamera();
+});
+
+startCamera();
+
+if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+  hud.textContent = "open via https or localhost (camera API needs a secure context)";
+}
+</script>
+</body>
+</html>

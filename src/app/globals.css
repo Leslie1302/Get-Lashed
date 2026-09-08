@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-body: var(--font-nunito-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* Warm paper palette — see README design notes */
+  --color-paper: #fbf7f1;
+  --color-linen: #f4ece2;
+  --color-sand: #e8dccb;
+  --color-espresso: #332720;
+  --color-cocoa: #6f5a4b;
+  --color-mocha: #9c8573;
+  --color-terracotta: #a24e27;
+  --color-clay: #883e1e;
+  --color-blush: #e4b79d;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@layer base {
+  body {
+    @apply bg-paper text-espresso font-body antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+}
