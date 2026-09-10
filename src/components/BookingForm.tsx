@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   BUSINESS,
   DEPOSIT_GHS,
@@ -39,17 +39,37 @@ const REASON_TEXT: Record<string, string> = {
   "calendar-error": "We couldn't load times just now.",
 };
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+/**
+ * The bookable date range, resolved in the browser.
+ *
+ * /book is prerendered, so anything computed during render is frozen at BUILD
+ * time — a week-old deploy offered a date picker whose earliest date was a week
+ * in the past. Reading the clock during render is also a hydration mismatch,
+ * since the server's "today" and the visitor's need not agree. Both problems
+ * go away by filling these in after mount; until then the input simply has no
+ * limits, and the server re-checks the date anyway.
+ */
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+/** Nothing to subscribe to: the value is fixed for the life of the page. */
+const noSubscribe = () => () => {};
+const noServerValue = () => undefined;
 
-function maxISO(): string {
-  return new Date(Date.now() + SCHEDULE.maxAdvanceDays * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+function useDateRange(): { min?: string; max?: string } {
+  // useSyncExternalStore is the primitive for "a value the server cannot know":
+  // the server snapshot is undefined, the client's is today's date, and React
+  // fills it in after hydration without a mismatch. Each snapshot returns the
+  // same string all day, so it is stable enough to compare by identity.
+  const min = useSyncExternalStore(noSubscribe, () => isoDay(Date.now()), noServerValue);
+  const max = useSyncExternalStore(
+    noSubscribe,
+    () => isoDay(Date.now() + SCHEDULE.maxAdvanceDays * 86_400_000),
+    noServerValue
+  );
+  return { min, max };
 }
 
 export default function BookingForm() {
+  const dateRange = useDateRange();
   const [service, setService] = useState<Service | null>(null);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -255,8 +275,8 @@ export default function BookingForm() {
             type="date"
             name="date"
             value={date}
-            min={todayISO()}
-            max={maxISO()}
+            min={dateRange.min}
+            max={dateRange.max}
             onChange={(e) => {
               setDate(e.target.value);
               setTime("");

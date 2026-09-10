@@ -170,6 +170,17 @@ for modals, Canvas 2D for AR.
 
 ## Traps
 
+- **CSP breaks hydration, and only in production.** Next ships the RSC payload
+  in inline `<script>` tags. A `script-src` without `'unsafe-inline'` (or a
+  nonce) blocks them, React never hydrates, and every page renders perfectly
+  while every button does nothing. Dev allows inline scripts, so this is
+  invisible locally and total on Vercel. `npm run check:csp` fails the build if
+  it comes back.
+- **`NEXT_PUBLIC_*` is baked in at build time, and `.env.local` is not
+  deployed.** Setting `NEXT_PUBLIC_ENABLE_AR` on your own machine does nothing
+  for the deployed site — it has to be a Vercel environment variable, and
+  changing it needs a **redeploy**, not just a save. If `/try-on` 404s in
+  production, that's why.
 - **CSP breaks MediaPipe.** WASM needs `script-src 'self' 'wasm-unsafe-eval'`.
   It's in `next.config.ts`. Re-test `/try-on` after touching that header.
 - **MediaPipe breaks SSR.** It touches `window`. It's imported *inside* the

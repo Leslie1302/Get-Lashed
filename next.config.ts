@@ -3,7 +3,21 @@ import type { NextConfig } from "next";
 const isDev = process.env.NODE_ENV === "development";
 
 /**
- * CSP. Two entries here are load-bearing and easy to break:
+ * CSP. Three entries are load-bearing and easy to break:
+ *
+ *  - 'unsafe-inline' in script-src. DO NOT REMOVE without replacing it with a
+ *    nonce. Next.js ships the RSC payload in INLINE <script> tags —
+ *    `(self.__next_f=self.__next_f||[]).push(...)` — plus the JSON-LD block.
+ *    Block those and React never hydrates: every page still renders, and every
+ *    button on the site silently does nothing. This shipped to production once
+ *    exactly that way, and it only reproduces in a production build, because
+ *    dev already allowed inline scripts. `npm run check:csp` guards it now.
+ *
+ *    The stricter alternative is a per-request nonce set in proxy.ts, which
+ *    Next stamps onto its own scripts. It costs static rendering — every page
+ *    becomes dynamic, since a nonce cannot be cached — so it isn't worth it
+ *    while nothing on the site renders user-supplied HTML. Revisit if that
+ *    ever changes.
  *
  *  - 'wasm-unsafe-eval' in script-src. MediaPipe compiles WebAssembly; without
  *    it /try-on dies silently while every other page looks fine. Re-test the
@@ -17,7 +31,7 @@ const isDev = process.env.NODE_ENV === "development";
  */
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval' 'unsafe-inline'" : ""}`,
+  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ""}`,
   // next/font/google downloads the fonts at build time and serves them from
   // our own origin, so no fonts.googleapis.com / fonts.gstatic.com here.
   "style-src 'self' 'unsafe-inline'",
