@@ -11,11 +11,12 @@
     "admin:hash": "node scripts/admin-hash.mjs",
     "postinstall": "node scripts/copy-ar-assets.mjs",
     "check:ar": "node scripts/check-ar.mjs",
-    "check:calendar": "node --env-file=.env.local scripts/check-calendar.mjs",
-    "check:csp": "node scripts/check-csp.mjs"
+    "check:csp": "node scripts/check-csp.mjs",
+    "db:setup": "node --env-file-if-exists=.env.local scripts/db-setup.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.35",
+    "@neondatabase/serverless": "^1.1.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",

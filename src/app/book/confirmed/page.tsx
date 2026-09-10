@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BUSINESS, DEPOSIT_GHS } from "@/lib/constants";
 import { formatPrice, whatsAppUrl } from "@/lib/format";
-import { confirmBooking, deleteEvent } from "@/lib/google-calendar";
+import { findByRef, markDepositPaid, setStatus } from "@/lib/bookings";
 import { isPaidInFull, paymentsConfigured, verifyTransaction } from "@/lib/paystack";
 
 export const metadata: Metadata = {
@@ -28,10 +28,10 @@ async function settle(reference: string | undefined): Promise<Outcome> {
 
   try {
     const transaction = await verifyTransaction(reference);
-    const eventId = transaction.metadata?.eventId;
+    const ref = transaction.metadata?.ref;
 
     if (isPaidInFull(transaction, DEPOSIT_GHS)) {
-      if (eventId) await confirmBooking(eventId);
+      if (ref) await markDepositPaid(ref);
       return {
         state: "paid",
         service: transaction.metadata?.service,
@@ -42,8 +42,9 @@ async function settle(reference: string | undefined): Promise<Outcome> {
 
     // Abandoned or declined: release the slot straight away rather than
     // waiting for the hold to age out, so the next client can take it.
-    if (eventId && transaction.status !== "ongoing" && transaction.status !== "pending") {
-      await deleteEvent(eventId).catch(() => {});
+    if (ref && transaction.status !== "ongoing" && transaction.status !== "pending") {
+      const booking = await findByRef(ref);
+      if (booking?.status === "pending") await setStatus(booking.id, "cancelled").catch(() => {});
     }
     return { state: "failed" };
   } catch (error) {

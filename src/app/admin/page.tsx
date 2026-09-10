@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
-import { calendarConfigured, listUpcoming, type CalendarEvent } from "@/lib/google-calendar";
-import { formatHours } from "@/lib/format";
+import { databaseConfigured } from "@/lib/db";
+import {
+  dateOverrides,
+  fallbackHours,
+  pendingRequests,
+  upcoming,
+  weeklyHours,
+  type Booking,
+  type DateOverride,
+  type DayHours,
+} from "@/lib/bookings";
 import AdminPanel from "@/components/AdminPanel";
 
 export const metadata: Metadata = {
@@ -8,40 +17,46 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Client contact details — never cache this page.
+// Client names and phone numbers — never cache this page.
 export const dynamic = "force-dynamic";
 
 const DAYS_AHEAD = 60;
 
 export default async function AdminPage() {
-  let events: CalendarEvent[] = [];
+  let pending: Booking[] = [];
+  let diary: Booking[] = [];
+  let hours: Record<string, DayHours | null> = fallbackHours();
+  let overrides: DateOverride[] = [];
   let error: string | null = null;
 
-  if (!calendarConfigured()) {
-    error = "GOOGLE_SERVICE_ACCOUNT_JSON isn't set, so bookings can't be listed.";
+  if (!databaseConfigured()) {
+    error =
+      "DATABASE_URL isn't set, so there's no schedule to read. Create the Neon database in Vercel and redeploy.";
   } else {
     try {
-      events = await listUpcoming(DAYS_AHEAD);
+      [pending, diary, hours, overrides] = await Promise.all([
+        pendingRequests(),
+        upcoming(DAYS_AHEAD),
+        weeklyHours(),
+        dateOverrides(),
+      ]);
     } catch (cause) {
       console.error("[admin]", cause);
-      error = "Couldn't reach Google Calendar.";
+      error =
+        "Couldn't reach the database. If this is a fresh deploy, run `npm run db:setup` to create the tables.";
     }
   }
 
-  const bookings = events.map((event) => {
-    const startIso = event.start?.dateTime ?? `${event.start?.date}T00:00:00Z`;
-    return {
-      id: event.id ?? startIso,
-      date: startIso.slice(0, 10),
-      time: event.start?.dateTime ? formatHours(startIso.slice(11, 16)) : "All day",
-      summary: event.summary ?? "(no title)",
-      details: event.description ?? "",
-    };
-  });
-
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
-      <AdminPanel bookings={bookings} error={error} days={DAYS_AHEAD} />
+      <AdminPanel
+        pending={pending}
+        diary={diary}
+        hours={hours}
+        overrides={overrides}
+        error={error}
+        days={DAYS_AHEAD}
+      />
     </div>
   );
 }

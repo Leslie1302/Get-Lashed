@@ -2,20 +2,16 @@ import { NextResponse } from "next/server";
 import { BOOKING_GUARD, BUSINESS, DEPOSIT_GHS } from "@/lib/constants";
 import { siteUrl } from "@/lib/site";
 import { initializeTransaction, paymentsConfigured } from "@/lib/paystack";
-import { formatPrice } from "@/lib/format";
+import { formatHours } from "@/lib/format";
 import { getService, isValidDate, verifySlot } from "@/lib/availability";
-import {
-  calendarConfigured,
-  deleteEvent,
-  freeEventId,
-  insertBooking,
-  slotEventId,
-} from "@/lib/google-calendar";
+import { createPending } from "@/lib/bookings";
+import { databaseConfigured } from "@/lib/db";
+import { bookingMessage, bookingWhatsAppUrl } from "@/lib/booking-message";
 
 /**
- * This route is an unauthenticated write to a live business calendar. The
- * guards below are load-bearing, not polish: without them one script fills the
- * owner's real schedule with junk and makes it unusable.
+ * An unauthenticated write to the studio's real schedule. The guards below are
+ * load-bearing, not polish: without them one script fills her diary with junk
+ * and makes it unusable.
  *
  * ponytail: the rate limiter is a per-instance Map. That is a real ceiling —
  * Vercel can run several instances, so the effective limit is
@@ -61,17 +57,27 @@ interface BookingBody {
   startedAt?: unknown;
 }
 
-function str(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
+const str = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
 function fail(message: string, status: number, code?: string) {
   return NextResponse.json({ error: message, code }, { status });
 }
 
+function dateLabel(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+}
+
 export async function POST(request: Request) {
   if (rateLimited(clientIp(request))) {
-    return fail("Too many booking attempts. Please try again later or message us on WhatsApp.", 429);
+    return fail(
+      "Too many booking attempts. Please try again later or message us on WhatsApp.",
+      429
+    );
   }
 
   let body: BookingBody;
@@ -108,7 +114,7 @@ export async function POST(request: Request) {
   if (email && !EMAIL.test(email)) return fail("That email address doesn't look right.", 400);
   if (notes.length > NOTES_MAX) return fail("Please shorten your notes.", 400);
 
-  if (!calendarConfigured()) {
+  if (!databaseConfigured()) {
     return fail(
       `Online booking isn't switched on yet — message us on WhatsApp at ${BUSINESS.phone} and we'll book you in.`,
       503,
@@ -116,8 +122,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Deposits are on only when an amount is set AND the key is present. With an
-  // amount but no key, refuse rather than quietly booking people for free.
   const takesDeposit = DEPOSIT_GHS > 0;
   if (takesDeposit && !paymentsConfigured()) {
     console.error("[book] DEPOSIT_GHS is set but PAYSTACK_SECRET_KEY is missing");
@@ -127,75 +131,68 @@ export async function POST(request: Request) {
       "unconfigured"
     );
   }
-  // Paystack sends the receipt by email, so it stops being optional.
   if (takesDeposit && !EMAIL.test(email)) {
     return fail("Please enter your email — we send the payment receipt there.", 400);
   }
 
   try {
-    // Duration and end time are re-derived from serviceId here. Whatever the
+    // Duration and end time are re-derived here from serviceId. Whatever the
     // client sent for them is ignored; its availability check was advisory.
     const slot = await verifySlot(date, time, service);
     if (!slot) {
       return fail("That slot was just taken. Please pick another time.", 409, "taken");
     }
 
-    const startMs = Date.parse(slot.startIso);
-    const id = (await freeEventId(startMs)) ?? slotEventId(startMs);
-    const result = await insertBooking({
-      id,
-      // The prefix makes an unpaid hold obvious at a glance in the calendar.
-      summary: `${takesDeposit ? "UNPAID · " : ""}${service.name} — ${name}`,
-      description: [
-        `Service: ${service.name} (${formatPrice(service.priceGHS)}, ${service.durationMins} min)`,
-        `Name: ${name}`,
-        `Phone: ${phone}`,
-        email ? `Email: ${email}` : null,
-        notes ? `Notes: ${notes}` : null,
-        takesDeposit
-          ? `Deposit due: ${formatPrice(DEPOSIT_GHS)} (balance ${formatPrice(
-              service.priceGHS - DEPOSIT_GHS
-            )} at the studio)`
-          : null,
-        "Booked online.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+    const created = await createPending({
+      serviceId: service.id,
       startIso: slot.startIso,
       endIso: slot.endIso,
-      status: takesDeposit ? "tentative" : "confirmed",
+      name,
+      phone,
+      email: email || null,
+      notes: notes || null,
     });
 
-    if (!result.ok) {
+    // The database rejected it: two people hit the same slot at once and
+    // Postgres picked a winner. Nothing here could have prevented that by
+    // checking first — that is the whole point of the unique index.
+    if (!created.ok) {
       return fail("That slot was just taken. Please pick another time.", 409, "taken");
     }
 
-    if (!takesDeposit) {
-      return NextResponse.json({
-        ok: true,
-        service: service.name,
-        date,
-        time: slot.label,
-        price: formatPrice(service.priceGHS),
-      });
-    }
+    const booking = created.booking;
+    const message = bookingMessage({
+      ref: booking.ref,
+      service,
+      dateLabel: dateLabel(date),
+      timeLabel: formatHours(time),
+      name,
+      phone,
+      notes: notes || null,
+    });
 
-    // The slot is now held as tentative. If anything below fails, or the
-    // client never pays, the hold expires by itself after HOLD_MINUTES.
+    const payload = {
+      ok: true as const,
+      ref: booking.ref,
+      service: service.name,
+      date: dateLabel(date),
+      time: formatHours(time),
+      whatsappUrl: bookingWhatsAppUrl(message),
+    };
+
+    if (!takesDeposit) return NextResponse.json(payload);
+
     try {
       const transaction = await initializeTransaction({
         email,
         amountGHS: DEPOSIT_GHS,
-        // Unique per attempt: Paystack rejects a reused reference, and one
-        // slot can legitimately be paid for twice if a first attempt failed.
-        reference: `${id}-${Date.now().toString(36)}`,
+        reference: `${booking.ref}-${Date.now().toString(36)}`,
         callbackUrl: `${siteUrl()}/book/confirmed`,
-        metadata: { eventId: id, service: service.name, date, time: slot.time },
+        metadata: { ref: booking.ref, service: service.name, date, time },
       });
-      return NextResponse.json({ ok: true, authorizationUrl: transaction.authorization_url });
+      return NextResponse.json({ ...payload, authorizationUrl: transaction.authorization_url });
     } catch (error) {
       console.error("[book] payment init", error);
-      await deleteEvent(id).catch(() => {}); // don't sit on a slot we can't sell
       return fail(
         `We couldn't start the payment. Please message us on WhatsApp at ${BUSINESS.phone}.`,
         502,
@@ -205,9 +202,9 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[book]", error);
     return fail(
-      `We couldn't reach the calendar. Please message us on WhatsApp at ${BUSINESS.phone}.`,
+      `We couldn't save your booking. Please message us on WhatsApp at ${BUSINESS.phone}.`,
       502,
-      "calendar-error"
+      "server-error"
     );
   }
 }

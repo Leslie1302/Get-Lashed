@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  availableSlots,
-  bookableWindow,
-  getService,
-  isValidDate,
-} from "@/lib/availability";
-import { calendarConfigured } from "@/lib/google-calendar";
+import { availableSlots, getService, isValidDate } from "@/lib/availability";
+import { databaseConfigured } from "@/lib/db";
 
 /** GET /api/book/slots?service=gel-manicure&date=2026-09-10 */
 export async function GET(request: Request) {
@@ -20,20 +15,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Date must be YYYY-MM-DD." }, { status: 400 });
   }
 
-  const window = bookableWindow(date, Date.now());
-  if ("unavailable" in window) {
-    return NextResponse.json({ slots: [], reason: window.unavailable });
-  }
-  if (!calendarConfigured()) {
-    // WhatsApp is the standing fallback whenever the calendar is unreachable.
+  if (!databaseConfigured()) {
+    // WhatsApp is the standing fallback whenever the schedule is unreachable.
     return NextResponse.json({ slots: [], reason: "unconfigured" }, { status: 503 });
   }
 
   try {
-    const slots = await availableSlots(date, service);
-    return NextResponse.json({ slots, reason: slots.length ? null : "full" });
+    const { slots, reason } = await availableSlots(date, service);
+    return NextResponse.json({ slots, reason });
   } catch (error) {
     console.error("[slots]", error);
-    return NextResponse.json({ slots: [], reason: "calendar-error" }, { status: 502 });
+    return NextResponse.json({ slots: [], reason: "schedule-error" }, { status: 502 });
   }
 }

@@ -28,7 +28,6 @@ type SlotState =
 
 const REASON_TEXT: Record<string, string> = {
   closed: "We're closed on that day. Try another date.",
-  blackout: "We're not taking bookings on that date.",
   past: "That date has already passed.",
   "too-far": `We only take bookings up to ${SCHEDULE.maxAdvanceDays} days ahead.`,
   "too-late": `Too late to book that day — we need ${
@@ -36,7 +35,7 @@ const REASON_TEXT: Record<string, string> = {
   } notice. Try a later date, or ask on WhatsApp.`,
   full: "Fully booked that day. Try another date.",
   unconfigured: "Online booking isn't switched on yet.",
-  "calendar-error": "We couldn't load times just now.",
+  "schedule-error": "We couldn't load times just now.",
 };
 
 /**
@@ -77,10 +76,11 @@ export default function BookingForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<{
+    ref: string;
     service: string;
     date: string;
     time: string;
-    price: string;
+    whatsappUrl: string;
   } | null>(null);
 
   // Submit-timing check: the server rejects anything filled implausibly fast.
@@ -104,13 +104,13 @@ export default function BookingForm() {
         const data = (await res.json()) as { slots?: Slot[]; reason?: string };
         if (data.slots?.length) return setSlotState({ status: "ready", slots: data.slots });
         if (!res.ok) {
-          return setSlotState({ status: "error", reason: data.reason ?? "calendar-error" });
+          return setSlotState({ status: "error", reason: data.reason ?? "schedule-error" });
         }
         setSlotState({ status: "empty", reason: data.reason ?? "full" });
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
-        setSlotState({ status: "error", reason: "calendar-error" });
+        setSlotState({ status: "error", reason: "schedule-error" });
       });
 
     return () => controller.abort();
@@ -144,10 +144,11 @@ export default function BookingForm() {
         error?: string;
         code?: string;
         authorizationUrl?: string;
+        ref?: string;
         service?: string;
         date?: string;
         time?: string;
-        price?: string;
+        whatsappUrl?: string;
       };
 
       // With a deposit due, the slot is held and the client goes to Paystack.
@@ -160,10 +161,11 @@ export default function BookingForm() {
 
       if (data.ok) {
         setConfirmed({
+          ref: data.ref!,
           service: data.service!,
           date: data.date!,
           time: data.time!,
-          price: data.price!,
+          whatsappUrl: data.whatsappUrl!,
         });
         return;
       }
@@ -195,29 +197,43 @@ export default function BookingForm() {
     return (
       <div className="rounded-2xl border border-sand bg-linen/60 p-8">
         <p className="text-sm font-bold uppercase tracking-[0.2em] text-terracotta">
-          You&rsquo;re booked
+          Request sent
         </p>
-        <h2 className="mt-3 font-display text-3xl font-medium">See you soon.</h2>
+        <h2 className="mt-3 font-display text-3xl font-medium">
+          One more tap to lock it in.
+        </h2>
         <dl className="mt-6 grid gap-3 text-base">
           <Row label="Service" value={confirmed.service} />
           <Row label="When" value={`${confirmed.date} at ${confirmed.time}`} />
-          <Row label="Price" value={confirmed.price} />
+          <Row label="Reference" value={confirmed.ref} />
           <Row label="Where" value={BUSINESS.address} />
         </dl>
+
         <p className="mt-6 text-sm leading-relaxed text-cocoa">
-          Need to change or cancel? Message us on WhatsApp — that&rsquo;s the fastest way to
-          reach us.
+          Your slot is held. Send the request on WhatsApp and she&rsquo;ll confirm the time
+          with you directly — usually within a few hours. If the time doesn&rsquo;t suit
+          her, she&rsquo;ll suggest another in the same chat.
         </p>
+
+        {/* The whole point of the screen. Prominent, and the message is already
+            written — the client only has to press send. */}
         <a
-          href={whatsAppUrl(
-            `Hi ${BUSINESS.name}! About my ${confirmed.service} booking on ${confirmed.date} at ${confirmed.time}...`
-          )}
+          href={confirmed.whatsappUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 inline-flex h-12 items-center rounded-md bg-espresso px-6 font-semibold text-paper hover:bg-cocoa"
+          className="mt-5 inline-flex h-14 w-full items-center justify-center gap-2 rounded-md bg-terracotta px-8 text-base font-semibold text-paper hover:bg-clay sm:w-auto"
         >
-          Message us on WhatsApp
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M17.47 14.38c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.95 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.47-.89-.79-1.49-1.76-1.66-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.49 0 1.47 1.07 2.89 1.22 3.09.15.2 2.11 3.22 5.11 4.51.71.31 1.27.49 1.71.63.72.23 1.37.2 1.89.12.58-.09 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35zM12.04 2h-.02C6.4 2 2 6.4 2 12.02c0 1.76.47 3.49 1.36 5.02L2 22l5.05-1.32a9.94 9.94 0 0 0 4.99 1.27h.02C17.6 22 22 17.6 22 11.98 22 6.4 17.6 2 12.04 2zm0 18.2h-.02c-1.5 0-2.97-.4-4.25-1.16l-.3-.18-3 .79.8-2.92-.2-.3a8.18 8.18 0 0 1-1.25-4.41C7.1 6.3 9.33 4.07 12.04 4.07c2.71 0 4.94 2.23 4.97 4.94 0 2.71-2.24 4.94-4.97 4.94z" />
+          </svg>
+          Send the request on WhatsApp
         </a>
+
+        <p className="mt-4 text-xs leading-relaxed text-mocha">
+          Didn&rsquo;t send? Your request is saved either way under{" "}
+          <span className="font-semibold">{confirmed.ref}</span> — she&rsquo;ll see it. But
+          sending gets you an answer far quicker.
+        </p>
       </div>
     );
   }

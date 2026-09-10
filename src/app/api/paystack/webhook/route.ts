@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { DEPOSIT_GHS } from "@/lib/constants";
-import { confirmBooking } from "@/lib/google-calendar";
+import { markDepositPaid } from "@/lib/bookings";
 import { isPaidInFull, paymentsConfigured, verifyWebhookSignature } from "@/lib/paystack";
 
 /**
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true }); // not ours to act on
   }
 
-  const eventId = event.data.metadata?.eventId;
+  const ref = event.data.metadata?.ref;
   const paid = isPaidInFull(
     {
       status: event.data.status ?? "",
@@ -56,15 +56,16 @@ export async function POST(request: Request) {
     DEPOSIT_GHS
   );
 
-  if (eventId && paid) {
+  if (ref && paid) {
     try {
-      // confirmBooking is idempotent, so the callback page and this webhook
-      // racing each other is harmless.
-      await confirmBooking(eventId);
+      // Marking the deposit paid is idempotent, so the callback page and this
+      // webhook racing each other is harmless. The booking stays PENDING —
+      // paying reserves the slot, the owner still has to accept the time.
+      await markDepositPaid(ref);
     } catch (error) {
-      // 500 asks Paystack to retry, which is what we want if Calendar is down.
+      // 500 asks Paystack to retry, which is what we want if the DB is down.
       console.error("[paystack webhook]", error);
-      return NextResponse.json({ error: "could not confirm" }, { status: 500 });
+      return NextResponse.json({ error: "could not record payment" }, { status: 500 });
     }
   }
 

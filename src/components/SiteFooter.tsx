@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { BUSINESS, SCHEDULE, WEEKDAY_ORDER } from "@/lib/constants";
+import { BUSINESS, WEEKDAY_ORDER } from "@/lib/constants";
+import { publicHours } from "@/lib/public-hours";
 import { formatHours, whatsAppUrl } from "@/lib/format";
 
-export default function SiteFooter() {
+export default async function SiteFooter() {
+  const hours = await publicHours();
   const week = WEEKDAY_ORDER.map((day) => ({
     day: day.charAt(0).toUpperCase() + day.slice(1),
-    hours: SCHEDULE.openingHours[day],
+    hours: hours[day],
   }));
 
   return (
@@ -72,7 +74,7 @@ export default function SiteFooter() {
                   </th>
                   <td className="py-1.5 text-right text-cocoa">
                     {hours
-                      ? `${formatHours(hours.open)} – ${formatHours(hours.close)}`
+                      ? `${formatHours(hours.opens)} – ${formatHours(hours.closes)}`
                       : "Closed"}
                   </td>
                 </tr>

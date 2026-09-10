@@ -1,10 +1,11 @@
 import {
   BUSINESS,
-  SCHEDULE,
+
   SERVICES,
   WEEKDAY_ORDER,
 } from "@/lib/constants";
 import { siteUrl } from "@/lib/site";
+import { publicHours } from "@/lib/public-hours";
 
 const SCHEMA_DAY: Record<string, string> = {
   monday: "Monday",
@@ -21,7 +22,8 @@ const SCHEMA_DAY: Record<string, string> = {
  * Google's local results — the single highest-value SEO item for a salon that
  * people find by searching "nails near me" in Accra.
  */
-export default function StructuredData() {
+export default async function StructuredData() {
+  const hours = await publicHours();
   const url = siteUrl();
 
   const data = {
@@ -43,14 +45,14 @@ export default function StructuredData() {
     },
     sameAs: Object.values(BUSINESS.socialLinks),
     openingHoursSpecification: WEEKDAY_ORDER.flatMap((day) => {
-      const hours = SCHEDULE.openingHours[day];
-      return hours
+      const h = hours[day];
+      return h
         ? [
             {
               "@type": "OpeningHoursSpecification",
               dayOfWeek: SCHEMA_DAY[day],
-              opens: hours.open,
-              closes: hours.close,
+              opens: h.opens,
+              closes: h.closes,
             },
           ]
         : [];

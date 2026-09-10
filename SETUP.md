@@ -41,23 +41,55 @@ Send the real menu as: **service name, price in GH₵, how long it takes.**
 `SCHEDULE` needs the real opening hours, the buffer between appointments, the
 minimum notice for a booking, and how far ahead people may book.
 
-## 3. Online booking — Google Calendar
+## 3. Online booking — the database
 
-1. [Google Cloud Console](https://console.cloud.google.com) → new project →
-   enable the **Google Calendar API**.
-2. Create a **service account**, then add a **JSON key** and download it.
-3. Open Google Calendar → the studio's calendar → **Settings and sharing** →
-   *Share with specific people* → add the service account's `client_email`
-   with permission **Make changes to events**.
-4. From that same settings page copy the **Calendar ID**.
-5. Put the whole JSON on one line as `GOOGLE_SERVICE_ACCOUNT_JSON`, and the
-   calendar ID as `GOOGLE_CALENDAR_ID`.
+Bookings and her opening hours live in Postgres. There is no Google account
+involved and nothing to copy by hand.
 
-A service account is used rather than signing in with Google because a refresh
-token from an unverified consent screen expires after seven days — booking
-would work all week and die the following Monday.
+1. Vercel → your project → **Storage** → **Create Database** → **Neon Postgres**
+   → connect it to this project. Vercel adds `DATABASE_URL` itself.
+2. Create the tables once. Locally:
 
-## 4. Portfolio gallery — Cloudinary
+   ```bash
+   npx vercel env pull .env.local
+   npm run db:setup
+   ```
+
+That's it. `/admin` then shows a **When you're open** panel where she sets her
+weekly hours and closes individual days. Those hours are what clients can book
+against, and they also drive the About page, the footer and the opening hours
+Google shows in search.
+
+### How a booking actually flows
+
+1. Client picks a service, a date and a free time, and leaves their details.
+2. The slot is **held** and the booking saved as *pending*. Nobody else can
+   take that time while she decides.
+3. The client taps **Send the request on WhatsApp** — the message is already
+   written, with the reference, service, time and their number.
+4. She opens `/admin`, and either **Confirms** (the slot greys out for good) or
+   taps **Can't make it** (the slot frees immediately). Either way she gets a
+   ready-written reply to send the client.
+5. A pending request she never answers stops holding its slot after 24 hours,
+   so an ignored request cannot quietly kill a Saturday afternoon.
+
+Nothing is lost if the client never taps send — the request is already saved
+and shows in `/admin` regardless.
+
+## 4. Her phone calendar
+
+Confirmed bookings are published as a calendar feed she subscribes to once, so
+they appear in her normal phone calendar with reminders.
+
+1. Generate a token: `openssl rand -hex 24`
+2. Put it in Vercel as `CALENDAR_FEED_TOKEN`, redeploy.
+3. On her phone: Calendar → Add account → **Subscribed calendar**, and paste
+   `https://<your-domain>/api/calendar/<that token>.ics`
+
+**That URL is the password.** Anyone with it sees client names and phone
+numbers, so don't post it anywhere. Change the token to revoke it.
+
+## 5. Portfolio gallery — Cloudinary
 
 1. Create a free [Cloudinary](https://cloudinary.com) account.
 2. Dashboard → copy **Cloud name**, **API Key**, **API Secret** into
@@ -68,7 +100,7 @@ upload photos and they appear on `/portfolio` immediately. The category chosen
 at upload becomes a Cloudinary tag, and those tags are the only "database" the
 gallery has.
 
-## 5. Deposits — Paystack
+## 6. Deposits — Paystack
 
 1. Create a [Paystack](https://paystack.com) account for the business.
 2. Settings → API Keys & Webhooks → copy the **test secret key**
@@ -86,7 +118,7 @@ gallery has.
 Enable Mobile Money in Paystack before launch. For a salon in Accra it will
 almost certainly carry most of the payments.
 
-## 6. Photos
+## 7. Photos
 
 - **Portfolio** — her actual finished work. Uploaded through `/admin` once
   Cloudinary is connected; no developer needed after that.
@@ -99,7 +131,7 @@ almost certainly carry most of the payments.
   placeholders. See "Adding a nail design" in the README for the spec; they
   are patterns, not photographs of nails.
 
-## 7. Admin password
+## 8. Admin password
 
 ```bash
 npm run admin:hash -- "a real password"
@@ -111,12 +143,11 @@ Copy both printed lines into `.env.local`. The password itself is never stored.
 
 ## Order I'd do it in
 
-1. **Business details, services and hours** — no accounts needed, and the site
-   stops telling visitors things that aren't true.
-2. **Cloudinary** — five minutes, and the portfolio is the most persuasive page
+1. **Business details and services** — no accounts needed, and the site stops
+   telling visitors things that aren't true.
+2. **The database** — two clicks in Vercel plus one command, and booking works.
+3. **Cloudinary** — five minutes, and the portfolio is the most persuasive page
    on the site.
-3. **Google Calendar** — the longest setup, and what makes the site useful
-   rather than a brochure.
 4. **Paystack in test mode** — prove the flow before real money touches it.
 5. **Photos**, as they come.
 6. **Paystack live key**, last.

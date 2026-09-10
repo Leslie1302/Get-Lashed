@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { publicHours } from "@/lib/public-hours";
 import {
   BUSINESS,
   PHOTOS,
@@ -15,7 +16,8 @@ export const metadata: Metadata = {
   title: "About",
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const hours = await publicHours();
   return (
     <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
       <header className="max-w-2xl">
@@ -129,14 +131,14 @@ export default function AboutPage() {
               <caption className="sr-only">Weekly opening hours</caption>
               <tbody>
                 {WEEKDAY_ORDER.map((day) => {
-                  const h = SCHEDULE.openingHours[day];
+                  const h = hours[day];
                   return (
                     <tr key={day} className="border-b border-sand/70 last:border-0">
                       <th scope="row" className="py-2.5 text-left font-body font-semibold text-espresso">
                         {day.charAt(0).toUpperCase() + day.slice(1)}
                       </th>
                       <td className="py-2.5 text-right text-cocoa">
-                        {h ? `${formatHours(h.open)} – ${formatHours(h.close)}` : "Closed"}
+                        {h ? `${formatHours(h.opens)} – ${formatHours(h.closes)}` : "Closed"}
                       </td>
                     </tr>
                   );
