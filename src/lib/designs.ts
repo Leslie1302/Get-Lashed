@@ -30,10 +30,17 @@ export interface LashDesign {
   id: string;
   name: string;
   color: string;
-  /** Length multiplier: natural < volume < dramatic. */
-  flair: 1 | 2 | 3;
+  /**
+   * Length multiplier, 1 (natural) to ~3 (dramatic). A plain number rather
+   * than 1|2|3 so the hybrid tiers can sit between the classic and volume
+   * looks — otherwise light and full hybrid render identically and splitting
+   * them tells the client nothing.
+   */
+  flair: number;
   /** The service this look books — id from SERVICES. */
   serviceId: string;
+  /** Which of that service's required options this look is, when it maps to one. */
+  optionId?: string;
 }
 
 // Ordered to match the menu: the BIAB and French finishes she actually sells
@@ -59,14 +66,41 @@ export const NAIL_DESIGNS: NailDesign[] = [
 ];
 
 /**
- * Which service a nail look books. Length decides it: a natural-length set is
- * BIAB on your own nails, anything longer is the acrylic set of that length.
+ * The nail services a client can preview, in the order they appear above the
+ * design swatches, each with the length it opens at.
+ *
+ * Soak-off is deliberately absent: it removes a set rather than being one, so
+ * there is nothing to look at.
  *
  * Kept here rather than on NAIL_LENGTHS so ar-geometry stays pure maths with
  * no idea the price list exists.
  */
-export function nailServiceId(lengthId: string): string {
-  return lengthId === "natural" ? "biab-natural" : `${lengthId}-acrylic-french`;
+export const TRY_ON_NAIL_SERVICES: { id: string; lengthId: string }[] = [
+  { id: "biab-natural", lengthId: "natural" },
+  { id: "biab-extensions", lengthId: "medium" },
+  { id: "short-acrylic-french", lengthId: "short" },
+  { id: "medium-acrylic-french", lengthId: "medium" },
+  { id: "long-acrylic-french", lengthId: "long" },
+  { id: "custom-stick-on-nails", lengthId: "medium" },
+];
+
+/**
+ * Which paid option the chosen finish implies, or null when the finish alone
+ * doesn't settle it.
+ *
+ * Custom Stick-On Nails is the clean case: its three tiers ARE finishes, so a
+ * plain colour is the GH₵100 set, a French tip the GH₵150, and a pattern the
+ * GH₵200 — no guessing, and the try-on can quote the real price.
+ *
+ * The acrylic + French sets take the extra-design add-on, but whether a given
+ * pattern is the GH₵20 or the GH₵30 tier isn't recorded per design, so those
+ * return null and the booking form asks.
+ */
+export function nailOptionId(serviceId: string, design: NailDesign): string | null {
+  if (serviceId !== "custom-stick-on-nails") return null;
+  if (design.extra) return "french-design";
+  if (design.tip) return "french";
+  return "plain-gel";
 }
 
 /**
@@ -80,9 +114,26 @@ export function nailServiceId(lengthId: string): string {
  */
 export const LASH_DESIGNS: LashDesign[] = [
   { id: "classic", name: "Classic", color: "#15130f", flair: 1, serviceId: "classic-lashes" },
-  { id: "hybrid", name: "Hybrid", color: "#0d0d0d", flair: 2, serviceId: "hybrid-lashes" },
+  {
+    id: "hybrid-light",
+    name: "Light Hybrid",
+    color: "#0d0d0d",
+    flair: 1.8,
+    serviceId: "hybrid-lashes",
+    optionId: "light",
+  },
+  {
+    id: "hybrid-full",
+    name: "Full Hybrid",
+    color: "#0d0d0d",
+    flair: 2.3,
+    serviceId: "hybrid-lashes",
+    optionId: "full",
+  },
   { id: "volume", name: "Volume", color: "#000000", flair: 3, serviceId: "volume-lashes" },
-  { id: "custom", name: "Custom", color: "#000000", flair: 3, serviceId: "custom-lashes" },
+  // No optionId: the two Custom tiers differ by price, not by anything this
+  // preview can draw, so the choice belongs on the booking form.
+  { id: "custom", name: "Custom", color: "#000000", flair: 3.2, serviceId: "custom-lashes" },
 ];
 
 /** CSS for the picker swatch, so a button shows the pattern it will paint. */

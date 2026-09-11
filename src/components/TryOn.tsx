@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { SERVICES, servicePrice } from "@/lib/constants";
+import { formatPrice } from "@/lib/format";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LASH_DESIGNS,
-  nailServiceId,
+  nailOptionId,
+  TRY_ON_NAIL_SERVICES,
   NAIL_DESIGNS,
   paintNail,
   swatchStyle,
@@ -281,7 +284,25 @@ export default function TryOn() {
   const [lash, setLash] = useState<LashDesign>(LASH_DESIGNS[1]);
   const [shape, setShape] = useState<NailShape>(NAIL_SHAPES[1]);
   const [nailLength, setNailLength] = useState<NailLength>(NAIL_LENGTHS[0]);
+  const [nailServiceId, setNailServiceId] = useState(TRY_ON_NAIL_SERVICES[0].id);
   const [facing, setFacing] = useState<"environment" | "user">("environment");
+
+  // Resolved once from the menu, so a service renamed or repriced in
+  // constants.ts shows through here with no second copy to update.
+  const nailServices = TRY_ON_NAIL_SERVICES.flatMap(({ id, lengthId }) => {
+    const service = SERVICES.find((s) => s.id === id);
+    return service ? [{ service, lengthId }] : [];
+  });
+  const nailService = nailServices.find((s) => s.service.id === nailServiceId)?.service;
+  const nailOption = nailService ? nailOptionId(nailService.id, nail) : null;
+  // Only the stick-on tiers resolve from the finish alone; everything else is
+  // decided on the booking form, so no price is promised here that could differ.
+  const extraCost = (d: NailDesign) => {
+    if (!nailService) return "";
+    const option = nailOptionId(nailService.id, d);
+    if (option) return `· ${formatPrice(servicePrice(nailService, option))}`;
+    return d.extra ? "+GH₵20–30" : "";
+  };
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -552,81 +573,121 @@ export default function TryOn() {
         </p>
       )}
 
-      {mode === "nails" && (
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <Choices
-            label="Shape"
-            options={NAIL_SHAPES}
-            selectedId={shape.id}
-            onSelect={setShape}
-          />
-          <Choices
-            label="Length"
-            options={NAIL_LENGTHS}
-            selectedId={nailLength.id}
-            onSelect={setNailLength}
-            hint="Anything past Natural is an extension set."
-          />
+      {mode === "nails" ? (
+        <>
+          <div className="mt-6">
+            <p className="text-sm font-semibold text-cocoa">Service</p>
+            <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Service">
+              {nailServices.map(({ service, lengthId }) => (
+                <button
+                  key={service.id}
+                  type="button"
+                  onClick={() => {
+                    setNailServiceId(service.id);
+                    // Open each set at the length it actually comes in. Still
+                    // adjustable — the picker beside the designs stays live.
+                    setNailLength(
+                      NAIL_LENGTHS.find((l) => l.id === lengthId) ?? NAIL_LENGTHS[0]
+                    );
+                  }}
+                  aria-pressed={nailServiceId === service.id}
+                  className={`flex h-12 flex-col items-start justify-center rounded-xl border px-4 text-left ${
+                    nailServiceId === service.id
+                      ? "border-terracotta bg-linen"
+                      : "border-sand hover:border-mocha"
+                  }`}
+                >
+                  <span className="text-sm font-semibold leading-tight">{service.name}</span>
+                  <span className="text-xs text-cocoa">
+                    {service.options ? "from " : ""}
+                    {formatPrice(service.priceGHS)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_15rem]">
+            <div>
+              <p className="text-sm font-semibold text-cocoa">Design</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {NAIL_DESIGNS.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setNail(d)}
+                    aria-pressed={nail.id === d.id}
+                    className={`flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold ${
+                      nail.id === d.id ? "border-terracotta bg-linen" : "border-sand"
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="h-4 w-4 rounded-full border border-black/10"
+                      style={swatchStyle(d)}
+                    />
+                    {d.name}
+                    {extraCost(d) && (
+                      <span className="text-xs font-normal text-mocha">{extraCost(d)}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid content-start gap-5">
+              <Choices
+                label="Shape"
+                options={NAIL_SHAPES}
+                selectedId={shape.id}
+                onSelect={setShape}
+              />
+              <Choices
+                label="Length"
+                options={NAIL_LENGTHS}
+                selectedId={nailLength.id}
+                onSelect={setNailLength}
+                hint="Preview only — the set's real length comes with the service."
+              />
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="mt-6">
+          <p className="text-sm font-semibold text-cocoa">Lash style</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {LASH_DESIGNS.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => setLash(d)}
+                aria-pressed={lash.id === d.id}
+                className={`flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold ${
+                  lash.id === d.id ? "border-terracotta bg-linen" : "border-sand"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-4 w-4 rounded-full border border-black/10"
+                  style={{ background: d.color }}
+                />
+                {d.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       <div className="mt-6">
-        <p className="text-sm font-semibold text-cocoa">
-          {mode === "nails" ? "Design" : "Lash style"}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {mode === "nails"
-            ? NAIL_DESIGNS.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => setNail(d)}
-                  aria-pressed={nail.id === d.id}
-                  className={`flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold ${
-                    nail.id === d.id ? "border-terracotta bg-linen" : "border-sand"
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="h-4 w-4 rounded-full border border-black/10"
-                    style={swatchStyle(d)}
-                  />
-                  {d.name}
-                  {d.extra && (
-                    <span className="text-xs font-normal text-mocha">+GH₵20–30</span>
-                  )}
-                </button>
-              ))
-            : LASH_DESIGNS.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => setLash(d)}
-                  aria-pressed={lash.id === d.id}
-                  className={`flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold ${
-                    lash.id === d.id ? "border-terracotta bg-linen" : "border-sand"
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="h-4 w-4 rounded-full border border-black/10"
-                    style={{ background: d.color }}
-                  />
-                  {d.name}
-                </button>
-              ))}
-        </div>
-
-        {/* The whole point of the try-on. Deep-links to /book with the matching
-            service already selected, so the look someone just liked is one tap
-            from being the thing they book. */}
         <BookThisLook
-          href={`/book?service=${
-            mode === "nails" ? nailServiceId(nailLength.id) : lash.serviceId
-          }`}
+          href={
+            mode === "nails"
+              ? `/book?service=${nailServiceId}${nailOption ? `&option=${nailOption}` : ""}`
+              : `/book?service=${lash.serviceId}${lash.optionId ? `&option=${lash.optionId}` : ""}`
+          }
           what={
             mode === "nails"
-              ? `${nailLength.name === "Natural" ? "BIAB on natural nails" : `${nailLength.name.toLowerCase()} ${shape.name.toLowerCase()} set`} in ${nail.name}`
+              ? `${nailService?.name ?? "this set"} — ${shape.name.toLowerCase()}, ${nail.name}`
               : `${lash.name} lashes`
           }
         />

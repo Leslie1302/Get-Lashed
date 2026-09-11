@@ -75,7 +75,9 @@ export default function BookingForm({ paymentRequired }: { paymentRequired: bool
   // /book?service=<id> from the "Book this service" buttons on /services.
   // Read once as the initial value rather than in an effect: as state it stays
   // editable, and the client isn't fighting a re-select if they change service.
-  const requested = useSearchParams().get("service");
+  const params = useSearchParams();
+  const requested = params.get("service");
+  const requestedOption = params.get("option");
   const [service, setService] = useState<Service | null>(
     () => SERVICES.find((s) => s.id === requested) ?? null
   );
@@ -84,7 +86,13 @@ export default function BookingForm({ paymentRequired }: { paymentRequired: bool
   // price on the button would be wrong in the meantime.
   const [optionId, setOptionId] = useState(() => {
     const preset = SERVICES.find((s) => s.id === requested);
-    return preset && !preset.options?.required ? "none" : "";
+    if (!preset) return "";
+    // ?option= comes from the try-on's "Book this look". Only honoured when it
+    // is genuinely one of this service's choices — an id from elsewhere would
+    // put a price on the button that the server would then refuse.
+    const valid = serviceChoices(preset).some((c) => c.id === requestedOption);
+    if (valid) return requestedOption!;
+    return preset.options?.required ? "" : "none";
   });
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");

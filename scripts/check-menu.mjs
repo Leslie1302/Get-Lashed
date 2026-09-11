@@ -97,9 +97,8 @@ for (const c of refill.options.choices) {
 const designs = readFileSync("src/lib/designs.ts", "utf8");
 const referenced = [
   ...[...designs.matchAll(/serviceId: "([^"]+)"/g)].map((m) => m[1]),
-  // nailServiceId() builds these from the length ids in ar-geometry.
-  "biab-natural",
-  ...["short", "medium", "long"].map((l) => `${l}-acrylic-french`),
+  // The nail service row on /try-on.
+  ...[...designs.matchAll(/\{ id: "([^"]+)", lengthId:/g)].map((m) => m[1]),
 ];
 for (const id of referenced) {
   assert.ok(ids.has(id), `try-on links to "${id}", which is not a service`);

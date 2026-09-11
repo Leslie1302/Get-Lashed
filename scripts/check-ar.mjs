@@ -243,7 +243,12 @@ for (const d of LASH_DESIGNS) {
   assert.ok(!lashIds.has(d.id), `duplicate lash design id: ${d.id}`);
   lashIds.add(d.id);
   assert.match(d.color, /^#[0-9a-f]{6}$/i, `"${d.id}" colour must be a 6-digit hex`);
-  assert.ok([1, 2, 3].includes(d.flair), `"${d.id}" flair must be 1, 2 or 3`);
+  // Multiplies lash length in the overlay. Outside this range it either
+  // renders shorter than the real lash line or runs off the eyelid.
+  assert.ok(
+    typeof d.flair === "number" && d.flair >= 1 && d.flair <= 3.5,
+    `"${d.id}" flair must be a number between 1 and 3.5`
+  );
 }
 
 console.log(
