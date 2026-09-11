@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import BookingForm from "@/components/BookingForm";
 import { BUSINESS, SCHEDULE } from "@/lib/constants";
 import { whatsAppUrl } from "@/lib/format";
@@ -28,14 +29,25 @@ export default function BookPage() {
           Booking around a public holiday? Message us on WhatsApp first — holidays
           aren&rsquo;t blocked out in the online diary, so a slot showing free may not be.
         </p>
-        <a
-          href={whatsAppUrl(`Hi ${BUSINESS.name}! I'd like to book an appointment.`)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-6 inline-flex h-12 items-center gap-2 rounded-md bg-espresso px-6 font-semibold text-paper hover:bg-cocoa"
-        >
-          Or book on WhatsApp
-        </a>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          {/* Ahead of the form, not after it: the payment and cancellation
+              terms only protect the studio if they were readable BEFORE the
+              client paid. */}
+          <Link
+            href="/policy"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-md border-2 border-terracotta px-6 font-semibold text-terracotta hover:bg-terracotta/10"
+          >
+            Read the booking policy
+          </Link>
+          <a
+            href={whatsAppUrl(`Hi ${BUSINESS.name}! I'd like to book an appointment.`)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-espresso px-6 font-semibold text-paper hover:bg-cocoa"
+          >
+            Or book on WhatsApp
+          </a>
+        </div>
       </header>
 
       <div className="mt-12">

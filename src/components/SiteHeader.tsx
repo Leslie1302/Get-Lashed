@@ -10,6 +10,9 @@ const NAV_LINKS = [
     ? [{ href: "/try-on", label: "Try on" }]
     : []),
   { href: "/about", label: "About" },
+  // Last in the row, but in it: "no payment = no confirmed appointment" is a
+  // term clients are held to, and a term nobody can find is hard to enforce.
+  { href: "/policy", label: "Policy" },
 ];
 
 export default function SiteHeader() {
