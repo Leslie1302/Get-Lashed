@@ -27,6 +27,17 @@ export function sql() {
 }
 
 /**
+ * Postgres 42P01 — the table isn't there. That is a different problem from an
+ * unreachable database and has a different fix (`npm run db:setup`), so the
+ * two must not collapse into one "couldn't reach the database" message: it
+ * sends you looking at the connection string when the connection was fine.
+ */
+export function isMissingTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("42P01") || /relation ".+" does not exist/.test(message);
+}
+
+/**
  * Raised when two people book the same slot at the same moment. The database
  * decides the winner via a unique index rather than the application checking
  * and then inserting, which is a race no amount of care in JavaScript fixes.

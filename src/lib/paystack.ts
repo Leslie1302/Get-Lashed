@@ -1,5 +1,9 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { CURRENCY, SUBUNIT, type VerifiedTransaction } from "@/lib/paystack-core";
+
+export { CURRENCY, isPaidInFull } from "@/lib/paystack-core";
+export type { VerifiedTransaction } from "@/lib/paystack-core";
 
 /**
  * Paystack, over plain fetch. Three endpoints and an HMAC check don't justify
@@ -12,9 +16,6 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  */
 const API = "https://api.paystack.co";
 
-/** GHS is a two-decimal currency; Paystack takes the amount in pesewas. */
-const SUBUNIT = 100;
-export const CURRENCY = "GHS";
 
 function secretKey(): string {
   const key = process.env.PAYSTACK_SECRET_KEY;
@@ -76,14 +77,6 @@ export async function initializeTransaction(params: {
   });
 }
 
-export interface VerifiedTransaction {
-  status: string;
-  amount: number;
-  currency: string;
-  reference: string;
-  metadata?: Record<string, string> | null;
-}
-
 /**
  * Confirm a transaction with Paystack directly. Never trust the browser's
  * callback: anyone can open /book/confirmed?reference=… and claim a slot they
@@ -92,14 +85,6 @@ export interface VerifiedTransaction {
  */
 export async function verifyTransaction(reference: string): Promise<VerifiedTransaction> {
   return api<VerifiedTransaction>(`/transaction/verify/${encodeURIComponent(reference)}`);
-}
-
-export function isPaidInFull(transaction: VerifiedTransaction, expectedGHS: number): boolean {
-  return (
-    transaction.status === "success" &&
-    transaction.currency === CURRENCY &&
-    transaction.amount >= Math.round(expectedGHS * SUBUNIT)
-  );
 }
 
 /**

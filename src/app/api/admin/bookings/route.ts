@@ -53,11 +53,16 @@ export async function POST(request: Request) {
         timeZone: "UTC",
       }),
       timeLabel: formatHours(booking.startsAt.slice(11, 16)),
+      paidGHS: booking.depositPaid ? service?.priceGHS : undefined,
     });
 
     return NextResponse.json({
       ok: true,
       status: booking.status,
+      // Declining a paid booking leaves money owed. Paystack refunds are a
+      // manual action in her dashboard — this app never moves money — so the
+      // panel has to say so out loud or it quietly doesn't happen.
+      refundOwed: booking.depositPaid && status !== "confirmed",
       // The client's own number, so the reply opens in the right chat.
       replyUrl: `https://wa.me/${booking.phone.replace(/\D/g, "").replace(/^0/, "233")}?text=${encodeURIComponent(reply)}`,
     });

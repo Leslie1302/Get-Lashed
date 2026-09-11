@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import BookingForm from "@/components/BookingForm";
 import { BUSINESS, SCHEDULE } from "@/lib/constants";
 import { whatsAppUrl } from "@/lib/format";
+import { paymentsConfigured } from "@/lib/paystack";
 
 export const metadata: Metadata = {
   title: "Book an appointment",
@@ -38,7 +39,7 @@ export default function BookPage() {
       </header>
 
       <div className="mt-12">
-        <BookingForm />
+        <BookingForm paymentRequired={paymentsConfigured()} />
       </div>
     </div>
   );

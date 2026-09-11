@@ -3,7 +3,7 @@ import { siteUrl } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   // /admin and /try-on are deliberately absent: one is private, the other Beta.
-  return ["", "/services", "/portfolio", "/book", "/about"].map((path) => ({
+  return ["", "/services", "/portfolio", "/book", "/about", "/policy"].map((path) => ({
     url: `${siteUrl()}${path}`,
     lastModified: new Date(),
     changeFrequency: path === "/portfolio" ? "weekly" : "monthly",

@@ -82,7 +82,7 @@ export default function AdminPanel({
 function Requests({ pending }: { pending: Booking[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState<number | null>(null);
-  const [reply, setReply] = useState<{ id: number; url: string; confirmed: boolean } | null>(
+  const [reply, setReply] = useState<{ id: number; url: string; confirmed: boolean; refundOwed: boolean } | null>(
     null
   );
 
@@ -93,10 +93,10 @@ function Requests({ pending }: { pending: Booking[] }) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id, status }),
     });
-    const data = (await res.json().catch(() => ({}))) as { replyUrl?: string };
+    const data = (await res.json().catch(() => ({}))) as { replyUrl?: string; refundOwed?: boolean };
     setBusy(null);
     if (res.ok && data.replyUrl) {
-      setReply({ id, url: data.replyUrl, confirmed: status === "confirmed" });
+      setReply({ id, url: data.replyUrl, confirmed: status === "confirmed", refundOwed: !!data.refundOwed });
     }
     router.refresh();
   }
@@ -149,6 +149,15 @@ function Requests({ pending }: { pending: Booking[] }) {
                   <p className="text-sm font-semibold">
                     {reply.confirmed ? "Confirmed." : "Declined — slot is free again."}
                   </p>
+                  <p className="mt-1 text-sm text-cocoa">
+                    She hasn&rsquo;t been told yet — send the message below.
+                  </p>
+                  {reply.refundOwed && (
+                    <p className="mt-2 rounded-md bg-terracotta/10 px-3 py-2 text-sm font-semibold text-terracotta">
+                      This booking was paid. Refund it in your Paystack dashboard &mdash;
+                      nothing here moves the money.
+                    </p>
+                  )}
                   <a
                     href={reply.url}
                     target="_blank"

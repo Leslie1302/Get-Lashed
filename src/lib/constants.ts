@@ -218,18 +218,34 @@ export const ADMIN_SESSION_HOURS = 8;
 export const PORTFOLIO_FOLDER = "portfolio";
 
 /**
- * Deposit taken online to confirm a booking, in cedis. The balance is settled
- * at the studio.
+ * Payment policy, as the studio states it publicly on /policy.
  *
- * ZERO DISABLES DEPOSITS: bookings confirm immediately and no payment is asked
- * for, which is how the site behaves right now. Set this to the amount the
- * studio actually charges, add PAYSTACK_SECRET_KEY, and the booking flow
- * switches to hold-then-pay.
+ * The appointment is paid IN FULL online — there is no part-deposit. So there
+ * is no amount to configure here: the charge is the service's own price, and a
+ * second copy of it in this file could only ever disagree with the price list.
  *
- * Deliberately not pre-filled — a guessed figure would charge real clients
- * real money.
+ * Payment is required whenever PAYSTACK_SECRET_KEY is set. Without the key the
+ * site falls back to taking requests over WhatsApp, which is how it behaves
+ * before Paystack is connected.
  */
-export const DEPOSIT_GHS = 0;
+export const POLICY = {
+  /** Minutes of lateness tolerated before the appointment may be shortened. */
+  graceMins: 15,
+  /** After this, it may be cut short or cancelled with no refund. */
+  lateCancelMins: 20,
+  /** Notice required to cancel or move without losing the payment. */
+  cancelNoticeHours: 10,
+  /** How early to arrive when a soak-off is needed. */
+  soakOffEarlyMins: 30,
+  maxGuests: 1,
+} as const;
+
+/**
+ * Both studio lines, for the policy page. Deliberately derived from BUSINESS
+ * rather than retyped: a phone number written twice is a phone number that
+ * eventually disagrees with itself.
+ */
+export const CONTACT_NUMBERS = [BUSINESS.phone, BUSINESS.phoneAlt] as const;
 
 /** Anti-abuse limits for the unauthenticated POST /api/book. */
 export const BOOKING_GUARD = {

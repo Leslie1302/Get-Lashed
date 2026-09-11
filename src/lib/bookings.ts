@@ -1,6 +1,7 @@
 import "server-only";
 import { SCHEDULE, WEEKDAY_ORDER } from "@/lib/constants";
 import { isSlotTakenError, sql } from "@/lib/db";
+import { paymentsConfigured } from "@/lib/paystack";
 
 export type BookingStatus = "pending" | "confirmed" | "declined" | "cancelled";
 
@@ -55,6 +56,23 @@ const toBooking = (r: Row): Booking => ({
  * so it stops counting after this long and the slot quietly returns.
  */
 export const PENDING_HOLD_HOURS = 24;
+
+/**
+ * An UNPAID pending booking is a different thing: someone reached Paystack and
+ * never finished. Studio policy is that unpaid bookings may be released, and
+ * holding a Saturday slot for a day because a tab was abandoned is exactly the
+ * damage the policy exists to prevent. Long enough to finish a Mobile Money
+ * prompt, short enough that nothing is lost.
+ *
+ * Only applies when payment is required at all — with Paystack off, every
+ * booking is unpaid by definition and gets the full hold.
+ */
+export const UNPAID_HOLD_MINUTES = 30;
+
+function pendingHoldMinutes(): { paid: number; unpaid: number } {
+  const full = PENDING_HOLD_HOURS * 60;
+  return { paid: full, unpaid: paymentsConfigured() ? UNPAID_HOLD_MINUTES : full };
+}
 
 /* ------------------------------------------------------------------ hours */
 
@@ -121,13 +139,15 @@ export async function clearDateOverride(date: string): Promise<void> {
 
 /** Live bookings overlapping a day — what makes a slot unavailable. */
 export async function busyOn(dayStartIso: string, dayEndIso: string): Promise<Booking[]> {
+  const hold = pendingHoldMinutes();
   const rows = (await sql()`
     SELECT * FROM bookings
     WHERE starts_at < ${dayEndIso} AND ends_at > ${dayStartIso}
       AND (
         status = 'confirmed'
-        OR (status = 'pending'
-            AND created_at > now() - (${PENDING_HOLD_HOURS} || ' hours')::interval)
+        OR (status = 'pending' AND created_at > now() - (
+              CASE WHEN deposit_paid THEN ${hold.paid} ELSE ${hold.unpaid} END
+            || ' minutes')::interval)
       )
     ORDER BY starts_at`) as Row[];
   return rows.map(toBooking);
@@ -146,9 +166,16 @@ export async function upcoming(days: number): Promise<Booking[]> {
 
 /** Requests still waiting on her, newest first. */
 export async function pendingRequests(): Promise<Booking[]> {
+  // Abandoned checkouts are not requests. When payment is required, an unpaid
+  // pending row is someone who opened Paystack and walked away — showing it
+  // would have her chasing people who never paid, and the policy says an
+  // unpaid booking isn't one. It stops holding the slot after
+  // UNPAID_HOLD_MINUTES either way.
+  const hideUnpaid = paymentsConfigured();
   const rows = (await sql()`
     SELECT * FROM bookings
     WHERE status = 'pending' AND ends_at > now()
+      AND (${!hideUnpaid} OR deposit_paid)
     ORDER BY created_at DESC`) as Row[];
   return rows.map(toBooking);
 }

@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BUSINESS, DEPOSIT_GHS } from "@/lib/constants";
+import { BUSINESS, POLICY } from "@/lib/constants";
 import { formatPrice, whatsAppUrl } from "@/lib/format";
 import { findByRef, markDepositPaid, setStatus } from "@/lib/bookings";
+import { getService } from "@/lib/availability";
+import { bookingMessage, bookingWhatsAppUrl } from "@/lib/booking-message";
+import { formatHours } from "@/lib/format";
 import { isPaidInFull, paymentsConfigured, verifyTransaction } from "@/lib/paystack";
 
 export const metadata: Metadata = {
@@ -13,7 +16,14 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 type Outcome =
-  | { state: "paid"; service?: string; date?: string; time?: string }
+  | {
+      state: "paid";
+      service: string;
+      when: string;
+      amountGHS: number;
+      /** Pre-written request to her, unlocked only by a verified payment. */
+      whatsappUrl: string;
+    }
   | { state: "failed" }
   | { state: "missing" };
 
@@ -29,14 +39,41 @@ async function settle(reference: string | undefined): Promise<Outcome> {
   try {
     const transaction = await verifyTransaction(reference);
     const ref = transaction.metadata?.ref;
+    const booking = ref ? await findByRef(ref) : null;
+    const service = booking && getService(booking.serviceId);
 
-    if (isPaidInFull(transaction, DEPOSIT_GHS)) {
-      if (ref) await markDepositPaid(ref);
+    // Expected amount comes from the booking's own service — the full price.
+    // Reading it from the query string or the transaction would let anyone
+    // confirm a booking by paying a pesewa.
+    if (service && booking && isPaidInFull(transaction, service.priceGHS)) {
+      await markDepositPaid(booking.ref);
+
+      const date = new Date(booking.startsAt);
+      const dateLabel = date.toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        timeZone: "UTC",
+      });
+      const timeLabel = formatHours(booking.startsAt.slice(11, 16));
+
       return {
         state: "paid",
-        service: transaction.metadata?.service,
-        date: transaction.metadata?.date,
-        time: transaction.metadata?.time,
+        service: service.name,
+        when: `${dateLabel} at ${timeLabel}`,
+        amountGHS: service.priceGHS,
+        whatsappUrl: bookingWhatsAppUrl(
+          bookingMessage({
+            ref: booking.ref,
+            service,
+            dateLabel,
+            timeLabel,
+            name: booking.clientName,
+            phone: booking.phone,
+            notes: booking.notes,
+            paid: true,
+          })
+        ),
       };
     }
 
@@ -63,20 +100,35 @@ export default async function ConfirmedPage({
 
   if (outcome.state === "paid") {
     return (
-      <Shell heading="You're booked." eyebrow="Confirmed">
+      <Shell heading="Payment received." eyebrow="One step left">
         <dl className="mt-6 grid gap-3 text-base">
-          {outcome.service && <Row label="Service" value={outcome.service} />}
-          {outcome.date && outcome.time && (
-            <Row label="When" value={`${outcome.date} at ${outcome.time}`} />
-          )}
-          <Row label="Deposit" value={`${formatPrice(DEPOSIT_GHS)} paid`} />
+          <Row label="Service" value={outcome.service} />
+          <Row label="When" value={outcome.when} />
+          <Row label="Paid" value={`${formatPrice(outcome.amountGHS)} in full`} />
           <Row label="Where" value={BUSINESS.address} />
         </dl>
+
+        <div className="mt-8 rounded-xl border border-terracotta/30 bg-terracotta/5 p-5">
+          <p className="font-semibold">Send your request so we can confirm the time.</p>
+          <p className="mt-1 text-sm leading-relaxed text-cocoa">
+            Your payment is received and the slot is held for you. Tap below and send the
+            message &mdash; it&rsquo;s already written. We&rsquo;ll reply on WhatsApp to confirm.
+          </p>
+          <a
+            href={outcome.whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex h-12 items-center justify-center rounded-md bg-espresso px-6 font-semibold text-paper hover:bg-cocoa"
+          >
+            Send my request on WhatsApp
+          </a>
+        </div>
+
         <p className="mt-6 text-sm leading-relaxed text-cocoa">
-          Your receipt is on its way by email. The balance is settled at the studio. Need to
-          change or cancel? Message us on WhatsApp — that&rsquo;s the fastest way to reach us.
+          Keep your Paystack payment reference. To cancel or move your appointment without
+          losing your payment, message us at least {POLICY.cancelNoticeHours} hours before.
+          Full terms are on our <Link href="/policy" className="underline">booking policy</Link>.
         </p>
-        <Actions message={`Hi ${BUSINESS.name}! About my booking...`} />
       </Shell>
     );
   }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   BUSINESS,
-  DEPOSIT_GHS,
+  POLICY,
   SCHEDULE,
   SERVICES,
   SERVICE_CATEGORIES,
@@ -67,7 +67,7 @@ function useDateRange(): { min?: string; max?: string } {
   return { min, max };
 }
 
-export default function BookingForm() {
+export default function BookingForm({ paymentRequired }: { paymentRequired: boolean }) {
   const dateRange = useDateRange();
   const [service, setService] = useState<Service | null>(null);
   const [date, setDate] = useState("");
@@ -364,10 +364,10 @@ export default function BookingForm() {
             placeholder="024 000 0000"
           />
           <Field
-            label={DEPOSIT_GHS > 0 ? "Email (for your receipt)" : "Email (optional)"}
+            label={paymentRequired ? "Email (for your payment reference)" : "Email (optional)"}
             name="email"
             type="email"
-            required={DEPOSIT_GHS > 0}
+            required={paymentRequired}
             autoComplete="email"
             className="sm:col-span-2"
           />
@@ -404,18 +404,22 @@ export default function BookingForm() {
           className="mt-6 inline-flex h-14 items-center rounded-md bg-terracotta px-10 text-base font-semibold text-paper hover:bg-clay disabled:opacity-50"
         >
           {submitting
-            ? DEPOSIT_GHS > 0
+            ? paymentRequired
               ? "Taking you to payment…"
               : "Booking…"
-            : DEPOSIT_GHS > 0
-              ? `Pay ${formatPrice(DEPOSIT_GHS)} deposit`
+            : paymentRequired && service
+              ? `Pay ${formatPrice(service.priceGHS)}`
               : "Confirm booking"}
         </button>
-        {DEPOSIT_GHS > 0 && service && (
+        {paymentRequired && (
           <p className="mt-3 text-sm text-cocoa">
-            A {formatPrice(DEPOSIT_GHS)} deposit confirms your slot. The balance of{" "}
-            {formatPrice(service.priceGHS - DEPOSIT_GHS)} is settled at the studio. Your slot is
-            held while you pay.
+            Appointments are paid in full online — no payment, no confirmed appointment. Your
+            slot is held while you pay. Cancel or move it at least {POLICY.cancelNoticeHours}{" "}
+            hours before and your payment is safe.{" "}
+            <Link href="/policy" className="underline">
+              Read the booking policy
+            </Link>
+            .
           </p>
         )}
         <p className="mt-3 text-sm text-cocoa">

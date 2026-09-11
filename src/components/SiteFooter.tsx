@@ -88,6 +88,10 @@ export default async function SiteFooter() {
           © {new Date().getFullYear()} {BUSINESS.name}. All rights reserved.{" "}
           <Link href="/book" className="underline hover:text-espresso">
             Book online
+          </Link>{" "}
+          &middot;{" "}
+          <Link href="/policy" className="underline hover:text-espresso">
+            Booking policy
           </Link>
         </p>
       </div>

@@ -1,4 +1,4 @@
-import { BUSINESS, DEPOSIT_GHS, type Service } from "@/lib/constants";
+import { BUSINESS, POLICY, type Service } from "@/lib/constants";
 import { formatPrice, whatsAppUrl } from "@/lib/format";
 
 /**
@@ -17,7 +17,8 @@ export function bookingMessage(params: {
   name: string;
   phone: string;
   notes?: string | null;
-  depositPaid?: boolean;
+  /** Paid in full online. Unpaid requests only happen when Paystack is off. */
+  paid?: boolean;
 }): string {
   return [
     `New booking request — ${params.ref}`,
@@ -28,9 +29,7 @@ export function bookingMessage(params: {
     `Name: ${params.name}`,
     `Phone: ${params.phone}`,
     params.notes ? `Notes: ${params.notes}` : null,
-    DEPOSIT_GHS > 0
-      ? `Deposit: ${params.depositPaid ? `${formatPrice(DEPOSIT_GHS)} paid` : "not paid"}`
-      : null,
+    params.paid ? `PAID: ${formatPrice(params.service.priceGHS)}` : null,
     "",
     "Please confirm, or suggest another time.",
   ]
@@ -50,17 +49,33 @@ export function decisionMessage(params: {
   serviceName: string;
   dateLabel: string;
   timeLabel: string;
+  /** Amount the client actually paid, in cedis. Zero when Paystack is off. */
+  paidGHS?: number;
 }): string {
   if (params.confirmed) {
     return [
       `Hi! Your ${params.serviceName} on ${params.dateLabel} at ${params.timeLabel} is confirmed.`,
       `Booking ${params.ref}.`,
+      params.paidGHS
+        ? `Payment of ${formatPrice(params.paidGHS)} received in full.`
+        : null,
+      `Please arrive on time — there's a ${POLICY.graceMins}-minute grace period.`,
       `See you at ${BUSINESS.address}.`,
-    ].join(" ");
+    ]
+      .filter((line) => line !== null)
+      .join(" ");
   }
   return [
     `Hi! I'm sorry — I can't make ${params.dateLabel} at ${params.timeLabel} work for your`,
     `${params.serviceName} (booking ${params.ref}).`,
+    // Never decline a paid booking without saying what happens to the money.
+    // Silence here reads as keeping it, and she has to act on the refund in
+    // Paystack herself — nothing in this app moves money back.
+    params.paidGHS
+      ? `Your ${formatPrice(params.paidGHS)} will be refunded in full, or I can hold it against a new time — whichever you prefer.`
+      : null,
     "Could we find another time? Here's what I have free:",
-  ].join(" ");
+  ]
+    .filter((line) => line !== null)
+    .join(" ");
 }

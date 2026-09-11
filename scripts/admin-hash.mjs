@@ -1,5 +1,6 @@
-// Generate the two admin secrets for .env.local / Vercel:
+// Generate the two admin secrets for the admin login:
 //   npm run admin:hash -- "your admin password"
+// Put both printed lines in .env.local AND in Netlify.
 // The password itself is never stored anywhere.
 import { randomBytes, scryptSync } from "node:crypto";
 

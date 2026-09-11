@@ -33,7 +33,7 @@ exact spot, and the first item in the menu is the lat/lng pair — click to copy
 `SERVICES` is entirely made up: eight invented treatments with invented prices
 and durations. This is the highest-risk placeholder on the site, because those
 numbers feed the price list, the booking form, how long each appointment
-blocks, the deposit balance, and the structured data Google shows in search
+blocks, the amount Paystack charges, and the structured data Google shows in search
 results.
 
 Send the real menu as: **service name, price in GH₵, how long it takes.**
@@ -114,10 +114,11 @@ gallery has.
    (`sk_test_…`) into `PAYSTACK_SECRET_KEY`.
 3. On the same page set the **webhook URL** to
    `https://<your-domain>/api/paystack/webhook`.
-4. In `src/lib/constants.ts`, set `DEPOSIT_GHS` to the deposit amount.
-   **It is `0` right now, which switches deposits off entirely** — bookings
-   confirm with no payment. It's deliberately unset rather than guessed,
-   because a made-up figure would charge real clients real money.
+4. There is no deposit amount to set. Studio policy is payment in full, so
+   the charge is the service's own price from `SERVICES` — which is why those
+   prices must be right before the key goes live. **Setting
+   `PAYSTACK_SECRET_KEY` is what switches payment on**; without it the site
+   takes unpaid requests over WhatsApp instead.
 5. Which payment methods appear — Mobile Money, card, bank — is controlled in
    the Paystack dashboard, not in the code, so it can change without a deploy.
 6. Test the whole flow in test mode, then swap to the `sk_live_…` key.

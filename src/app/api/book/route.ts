@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BOOKING_GUARD, BUSINESS, DEPOSIT_GHS } from "@/lib/constants";
+import { BOOKING_GUARD, BUSINESS } from "@/lib/constants";
 import { siteUrl } from "@/lib/site";
 import { initializeTransaction, paymentsConfigured } from "@/lib/paystack";
 import { formatHours } from "@/lib/format";
@@ -122,17 +122,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const takesDeposit = DEPOSIT_GHS > 0;
-  if (takesDeposit && !paymentsConfigured()) {
-    console.error("[book] DEPOSIT_GHS is set but PAYSTACK_SECRET_KEY is missing");
-    return fail(
-      `Online payment isn't available right now. Please message us on WhatsApp at ${BUSINESS.phone}.`,
-      503,
-      "unconfigured"
-    );
-  }
-  if (takesDeposit && !EMAIL.test(email)) {
-    return fail("Please enter your email — we send the payment receipt there.", 400);
+  // Studio policy: no payment, no confirmed appointment. Payment is the full
+  // service price, so there is no deposit amount to configure — the price list
+  // is the only place a price lives.
+  const takesPayment = paymentsConfigured();
+  if (takesPayment && !EMAIL.test(email)) {
+    return fail("Please enter your email — Paystack sends your payment reference there.", 400);
   }
 
   try {
@@ -161,31 +156,36 @@ export async function POST(request: Request) {
     }
 
     const booking = created.booking;
-    const message = bookingMessage({
-      ref: booking.ref,
-      service,
-      dateLabel: dateLabel(date),
-      timeLabel: formatHours(time),
-      name,
-      phone,
-      notes: notes || null,
-    });
-
     const payload = {
       ok: true as const,
       ref: booking.ref,
       service: service.name,
       date: dateLabel(date),
       time: formatHours(time),
-      whatsappUrl: bookingWhatsAppUrl(message),
     };
 
-    if (!takesDeposit) return NextResponse.json(payload);
+    // No Paystack configured: fall back to an unpaid WhatsApp request. The
+    // handoff link is only ever returned on this path — when payment IS
+    // required, the client must not be able to send the request without
+    // paying, so the link is issued by /book/confirmed after Paystack has
+    // verified the transaction, and never here.
+    if (!takesPayment) {
+      const message = bookingMessage({
+        ref: booking.ref,
+        service,
+        dateLabel: dateLabel(date),
+        timeLabel: formatHours(time),
+        name,
+        phone,
+        notes: notes || null,
+      });
+      return NextResponse.json({ ...payload, whatsappUrl: bookingWhatsAppUrl(message) });
+    }
 
     try {
       const transaction = await initializeTransaction({
         email,
-        amountGHS: DEPOSIT_GHS,
+        amountGHS: service.priceGHS,
         reference: `${booking.ref}-${Date.now().toString(36)}`,
         callbackUrl: `${siteUrl()}/book/confirmed`,
         metadata: { ref: booking.ref, service: service.name, date, time },

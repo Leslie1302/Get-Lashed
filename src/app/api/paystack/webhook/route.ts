@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { DEPOSIT_GHS } from "@/lib/constants";
-import { markDepositPaid } from "@/lib/bookings";
+import { findByRef, markDepositPaid } from "@/lib/bookings";
+import { getService } from "@/lib/availability";
 import { isPaidInFull, paymentsConfigured, verifyWebhookSignature } from "@/lib/paystack";
 
 /**
@@ -45,28 +45,34 @@ export async function POST(request: Request) {
   }
 
   const ref = event.data.metadata?.ref;
-  const paid = isPaidInFull(
-    {
-      status: event.data.status ?? "",
-      amount: event.data.amount ?? 0,
-      currency: event.data.currency ?? "",
-      reference: event.data.reference ?? "",
-      metadata: event.data.metadata,
-    },
-    DEPOSIT_GHS
-  );
+  if (!ref) return NextResponse.json({ ok: true });
 
-  if (ref && paid) {
-    try {
-      // Marking the deposit paid is idempotent, so the callback page and this
-      // webhook racing each other is harmless. The booking stays PENDING —
-      // paying reserves the slot, the owner still has to accept the time.
-      await markDepositPaid(ref);
-    } catch (error) {
-      // 500 asks Paystack to retry, which is what we want if the DB is down.
-      console.error("[paystack webhook]", error);
-      return NextResponse.json({ error: "could not record payment" }, { status: 500 });
-    }
+  try {
+    // The expected amount comes from the booking's own service, never from the
+    // event: the charge is the full service price, and trusting the amount
+    // Paystack reports against itself would accept any underpayment.
+    const booking = await findByRef(ref);
+    const service = booking && getService(booking.serviceId);
+    if (!service) return NextResponse.json({ ok: true });
+
+    const paid = isPaidInFull(
+      {
+        status: event.data.status ?? "",
+        amount: event.data.amount ?? 0,
+        currency: event.data.currency ?? "",
+        reference: event.data.reference ?? "",
+        metadata: event.data.metadata,
+      },
+      service.priceGHS
+    );
+
+    // Idempotent, so this racing the callback page is harmless. The booking
+    // stays PENDING — paying holds the slot, the owner still accepts the time.
+    if (paid) await markDepositPaid(ref);
+  } catch (error) {
+    // 500 asks Paystack to retry, which is what we want if the DB is down.
+    console.error("[paystack webhook]", error);
+    return NextResponse.json({ error: "could not record payment" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
