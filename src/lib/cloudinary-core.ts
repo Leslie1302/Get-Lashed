@@ -1,4 +1,4 @@
-export const CATEGORY_TAGS = ["nails", "lashes", "pedimani"] as const;
+export const CATEGORY_TAGS = ["nails", "lashes", "pedicure"] as const;
 export type CategoryTag = (typeof CATEGORY_TAGS)[number];
 
 export interface PortfolioItem {

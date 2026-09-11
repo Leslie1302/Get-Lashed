@@ -52,7 +52,7 @@ export default async function AboutPage() {
                 sound like every other salon page. */}
             <p>
               {BUSINESS.name} is a small studio in Accra doing nails, lashes and
-              pedi-mani, run by one technician who does every set herself.
+              pedicures, run by one technician who does every set herself.
             </p>
             <p>
               Everything runs by appointment. Each booking gets its own slot plus a{" "}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import BookingForm from "@/components/BookingForm";
 import { BUSINESS, SCHEDULE } from "@/lib/constants";
 import { whatsAppUrl } from "@/lib/format";
@@ -7,7 +8,7 @@ import { paymentsConfigured } from "@/lib/paystack";
 
 export const metadata: Metadata = {
   title: "Book an appointment",
-  description: `Book nails, lashes or pedi-mani with ${BUSINESS.name} in Accra — pick a service, a day and a time, or message us on WhatsApp.`,
+  description: `Book nails, lashes or a pedicure with ${BUSINESS.name} in Accra — pick a service, a day and a time, or message us on WhatsApp.`,
 };
 
 export default function BookPage() {
@@ -51,7 +52,9 @@ export default function BookPage() {
       </header>
 
       <div className="mt-12">
-        <BookingForm paymentRequired={paymentsConfigured()} />
+        <Suspense fallback={<p className="text-cocoa">Loading the booking form…</p>}>
+          <BookingForm paymentRequired={paymentsConfigured()} />
+        </Suspense>
       </div>
     </div>
   );

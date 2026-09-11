@@ -55,6 +55,10 @@ await sql`
     decided_at TIMESTAMPTZ
   )`;
 
+// Added after launch, so it is a separate ALTER rather than part of the
+// CREATE above: an existing database must gain the column too.
+await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS option_id TEXT`;
+
 // The whole double-booking defence, in one line. A partial unique index means
 // two live bookings can never share a start time — the second insert fails
 // inside Postgres, atomically, however close together the two requests are.

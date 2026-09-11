@@ -3,6 +3,7 @@ import { adminSession } from "@/lib/admin-guard";
 import { getService } from "@/lib/availability";
 import { setStatus, type BookingStatus } from "@/lib/bookings";
 import { formatHours } from "@/lib/format";
+import { servicePrice } from "@/lib/constants";
 import { decisionMessage } from "@/lib/booking-message";
 
 /**
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
         timeZone: "UTC",
       }),
       timeLabel: formatHours(booking.startsAt.slice(11, 16)),
-      paidGHS: booking.depositPaid ? service?.priceGHS : undefined,
+      paidGHS:
+        booking.depositPaid && service ? servicePrice(service, booking.optionId) : undefined,
     });
 
     return NextResponse.json({

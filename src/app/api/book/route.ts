@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { BOOKING_GUARD, BUSINESS } from "@/lib/constants";
+import {
+  BOOKING_GUARD,
+  BUSINESS,
+  choiceMissing,
+  serviceChoice,
+  servicePrice,
+} from "@/lib/constants";
 import { siteUrl } from "@/lib/site";
 import { initializeTransaction, paymentsConfigured } from "@/lib/paystack";
 import { formatHours } from "@/lib/format";
@@ -47,6 +53,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface BookingBody {
   serviceId?: unknown;
+  optionId?: unknown;
   date?: unknown;
   time?: unknown;
   name?: unknown;
@@ -99,6 +106,7 @@ export async function POST(request: Request) {
   }
 
   const service = getService(str(body.serviceId));
+  const optionId = str(body.optionId) || null;
   const date = str(body.date);
   const time = str(body.time);
   const name = str(body.name);
@@ -107,6 +115,19 @@ export async function POST(request: Request) {
   const notes = str(body.notes);
 
   if (!service) return fail("Please choose a service.", 400);
+
+  // The chosen extra decides the amount charged, so it is re-resolved here
+  // against the menu. An id the menu doesn't contain resolves to null and is
+  // never billed — the browser cannot invent a cheaper option, or a free one.
+  const chosen = serviceChoice(service, optionId);
+  if (choiceMissing(service, optionId)) {
+    return fail(`Please choose an option for ${service.name}.`, 400);
+  }
+  if (optionId && optionId !== "none" && !chosen) {
+    return fail("That option isn't available for this service.", 400);
+  }
+  const amountGHS = servicePrice(service, optionId);
+
   if (!isValidDate(date)) return fail("Please choose a valid date.", 400);
   if (!/^\d{2}:\d{2}$/.test(time)) return fail("Please choose a time.", 400);
   if (name.length < 2 || name.length > NAME_MAX) return fail("Please enter your name.", 400);
@@ -140,6 +161,7 @@ export async function POST(request: Request) {
 
     const created = await createPending({
       serviceId: service.id,
+      optionId: chosen?.id ?? null,
       startIso: slot.startIso,
       endIso: slot.endIso,
       name,
@@ -178,6 +200,8 @@ export async function POST(request: Request) {
         name,
         phone,
         notes: notes || null,
+        optionLabel: chosen?.label ?? null,
+        totalGHS: amountGHS,
       });
       return NextResponse.json({ ...payload, whatsappUrl: bookingWhatsAppUrl(message) });
     }
@@ -185,7 +209,7 @@ export async function POST(request: Request) {
     try {
       const transaction = await initializeTransaction({
         email,
-        amountGHS: service.priceGHS,
+        amountGHS,
         reference: `${booking.ref}-${Date.now().toString(36)}`,
         callbackUrl: `${siteUrl()}/book/confirmed`,
         metadata: { ref: booking.ref, service: service.name, date, time },

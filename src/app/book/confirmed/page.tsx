@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BUSINESS, POLICY } from "@/lib/constants";
+import { BUSINESS, POLICY, serviceChoice, servicePrice } from "@/lib/constants";
 import { formatPrice, whatsAppUrl } from "@/lib/format";
 import { findByRef, markDepositPaid, setStatus } from "@/lib/bookings";
 import { getService } from "@/lib/availability";
@@ -45,7 +45,11 @@ async function settle(reference: string | undefined): Promise<Outcome> {
     // Expected amount comes from the booking's own service — the full price.
     // Reading it from the query string or the transaction would let anyone
     // confirm a booking by paying a pesewa.
-    if (service && booking && isPaidInFull(transaction, service.priceGHS)) {
+    // Expected amount includes the extra they chose. Checking against the base
+    // price alone would accept GH₵250 for a GH₵280 appointment.
+    const amount = service && booking ? servicePrice(service, booking.optionId) : 0;
+
+    if (service && booking && isPaidInFull(transaction, amount)) {
       await markDepositPaid(booking.ref);
 
       const date = new Date(booking.startsAt);
@@ -61,7 +65,7 @@ async function settle(reference: string | undefined): Promise<Outcome> {
         state: "paid",
         service: service.name,
         when: `${dateLabel} at ${timeLabel}`,
-        amountGHS: service.priceGHS,
+        amountGHS: amount,
         whatsappUrl: bookingWhatsAppUrl(
           bookingMessage({
             ref: booking.ref,
@@ -71,7 +75,9 @@ async function settle(reference: string | undefined): Promise<Outcome> {
             name: booking.clientName,
             phone: booking.phone,
             notes: booking.notes,
-            paid: true,
+            optionLabel: serviceChoice(service, booking.optionId)?.label ?? null,
+            totalGHS: amount,
+            paidGHS: amount,
           })
         ),
       };

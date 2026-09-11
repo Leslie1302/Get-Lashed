@@ -9,6 +9,8 @@ export interface Booking {
   id: number;
   ref: string;
   serviceId: string;
+  /** Which extra the client picked, if the service offers any. */
+  optionId: string | null;
   startsAt: string;
   endsAt: string;
   clientName: string;
@@ -24,6 +26,7 @@ interface Row {
   id: number;
   ref: string;
   service_id: string;
+  option_id: string | null;
   starts_at: string;
   ends_at: string;
   client_name: string;
@@ -39,6 +42,7 @@ const toBooking = (r: Row): Booking => ({
   id: r.id,
   ref: r.ref,
   serviceId: r.service_id,
+  optionId: r.option_id,
   startsAt: new Date(r.starts_at).toISOString(),
   endsAt: new Date(r.ends_at).toISOString(),
   clientName: r.client_name,
@@ -204,6 +208,7 @@ export type CreateResult =
 
 export async function createPending(input: {
   serviceId: string;
+  optionId: string | null;
   startIso: string;
   endIso: string;
   name: string;
@@ -215,9 +220,11 @@ export async function createPending(input: {
   try {
     const rows = (await sql()`
       INSERT INTO bookings
-        (ref, service_id, starts_at, ends_at, client_name, phone, email, notes, deposit_paid)
+        (ref, service_id, option_id, starts_at, ends_at,
+         client_name, phone, email, notes, deposit_paid)
       VALUES
-        (${makeRef()}, ${input.serviceId}, ${input.startIso}, ${input.endIso},
+        (${makeRef()}, ${input.serviceId}, ${input.optionId},
+         ${input.startIso}, ${input.endIso},
          ${input.name}, ${input.phone}, ${input.email}, ${input.notes},
          ${input.depositPaid ?? false})
       RETURNING *`) as Row[];

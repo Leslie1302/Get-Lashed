@@ -20,7 +20,7 @@ const nunitoSans = Nunito_Sans({
 });
 
 const SERVICES_TEASER =
-  "Manicures, gel & extensions, lash sets and lifts, and pedi-mani treatments in Accra, Ghana.";
+  "BIAB, acrylics and French tips, classic to custom lash sets, and pedicures in Accra, Ghana.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),

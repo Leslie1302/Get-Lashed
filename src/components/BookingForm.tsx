@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   BUSINESS,
   POLICY,
   SCHEDULE,
+  serviceChoices,
+  servicePrice,
   SERVICES,
   SERVICE_CATEGORIES,
   type Service,
@@ -69,7 +72,20 @@ function useDateRange(): { min?: string; max?: string } {
 
 export default function BookingForm({ paymentRequired }: { paymentRequired: boolean }) {
   const dateRange = useDateRange();
-  const [service, setService] = useState<Service | null>(null);
+  // /book?service=<id> from the "Book this service" buttons on /services.
+  // Read once as the initial value rather than in an effect: as state it stays
+  // editable, and the client isn't fighting a re-select if they change service.
+  const requested = useSearchParams().get("service");
+  const [service, setService] = useState<Service | null>(
+    () => SERVICES.find((s) => s.id === requested) ?? null
+  );
+  // Which extra is picked. Reset whenever the service changes — an option id
+  // from a previous service would be rejected by the server anyway, but the
+  // price on the button would be wrong in the meantime.
+  const [optionId, setOptionId] = useState(() => {
+    const preset = SERVICES.find((s) => s.id === requested);
+    return preset && !preset.options?.required ? "none" : "";
+  });
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [slotState, setSlotState] = useState<SlotState>({ status: "idle" });
@@ -129,6 +145,7 @@ export default function BookingForm({ paymentRequired }: { paymentRequired: bool
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           serviceId: service.id,
+          optionId,
           date,
           time,
           name: form.get("name"),
@@ -265,6 +282,9 @@ export default function BookingForm({ paymentRequired }: { paymentRequired: bool
                       checked={service?.id === s.id}
                       onChange={() => {
                         setService(s);
+                        // Required options start unset so the client must choose;
+                        // optional ones default to declining.
+                        setOptionId(s.options?.required ? "" : "none");
                         setTime("");
                         setSlotState(date ? { status: "loading" } : { status: "idle" });
                       }}
@@ -272,8 +292,12 @@ export default function BookingForm({ paymentRequired }: { paymentRequired: bool
                     />
                     <span className="block font-semibold">{s.name}</span>
                     <span className="mt-1 block text-sm text-cocoa">
+                      {s.options || s.priceNote ? "from " : ""}
                       {formatPrice(s.priceGHS)} · {formatDuration(s.durationMins)}
                     </span>
+                    {s.priceNote && (
+                      <span className="mt-1 block text-xs text-mocha">{s.priceNote}</span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -281,6 +305,41 @@ export default function BookingForm({ paymentRequired }: { paymentRequired: bool
           ))}
         </div>
       </fieldset>
+
+      {service?.options && (
+        <fieldset className="mt-12">
+          <legend className="font-display text-2xl font-medium">{service.options.label}</legend>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {serviceChoices(service).map((choice) => (
+              <label
+                key={choice.id}
+                className={`cursor-pointer rounded-xl border p-4 transition-colors ${
+                  optionId === choice.id
+                    ? "border-terracotta bg-linen"
+                    : "border-sand hover:border-mocha"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="option"
+                  value={choice.id}
+                  checked={optionId === choice.id}
+                  onChange={() => setOptionId(choice.id)}
+                  className="sr-only"
+                />
+                <span className="block font-semibold">{choice.label}</span>
+                <span className="mt-1 block text-sm text-cocoa">
+                  {choice.addGHS > 0
+                    ? `+${formatPrice(choice.addGHS)} — ${formatPrice(
+                        service.priceGHS + choice.addGHS
+                      )} total`
+                    : `${formatPrice(service.priceGHS)} total`}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       <fieldset disabled={!service} className="disabled:opacity-45">
         <legend className="font-display text-2xl font-medium">2. Pick a date &amp; time</legend>
@@ -400,7 +459,7 @@ export default function BookingForm({ paymentRequired }: { paymentRequired: bool
 
         <button
           type="submit"
-          disabled={submitting || !time}
+          disabled={submitting || !time || !optionId}
           className="mt-6 inline-flex h-14 items-center rounded-md bg-terracotta px-10 text-base font-semibold text-paper hover:bg-clay disabled:opacity-50"
         >
           {submitting
@@ -408,7 +467,7 @@ export default function BookingForm({ paymentRequired }: { paymentRequired: bool
               ? "Taking you to payment…"
               : "Booking…"
             : paymentRequired && service
-              ? `Pay ${formatPrice(service.priceGHS)}`
+              ? `Pay ${formatPrice(servicePrice(service, optionId))}`
               : "Confirm booking"}
         </button>
         {paymentRequired && (

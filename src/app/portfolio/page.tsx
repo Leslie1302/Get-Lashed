@@ -11,7 +11,7 @@ const CATEGORY_TABS = [
   { tag: null, label: "All" },
   { tag: "nails", label: "Nails" },
   { tag: "lashes", label: "Lashes" },
-  { tag: "pedimani", label: "Pedi & Mani" },
+  { tag: "pedicure", label: "Pedicure" },
 ] as const;
 
 export default async function PortfolioPage({

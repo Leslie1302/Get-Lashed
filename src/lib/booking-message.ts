@@ -17,19 +17,24 @@ export function bookingMessage(params: {
   name: string;
   phone: string;
   notes?: string | null;
-  /** Paid in full online. Unpaid requests only happen when Paystack is off. */
-  paid?: boolean;
+  /** The extra the client picked, spelled out — she needs to know to allow for it. */
+  optionLabel?: string | null;
+  /** Base plus the chosen extra — what the appointment costs. */
+  totalGHS: number;
+  /** Set only when the money has actually arrived. Never inferred from total. */
+  paidGHS?: number | null;
 }): string {
   return [
     `New booking request — ${params.ref}`,
     "",
-    `${params.service.name} · ${formatPrice(params.service.priceGHS)} · ${params.service.durationMins} min`,
+    `${params.service.name} · ${formatPrice(params.totalGHS)} · ${params.service.durationMins} min`,
+    params.optionLabel ? `Option: ${params.optionLabel}` : null,
     `${params.dateLabel} at ${params.timeLabel}`,
     "",
     `Name: ${params.name}`,
     `Phone: ${params.phone}`,
     params.notes ? `Notes: ${params.notes}` : null,
-    params.paid ? `PAID: ${formatPrice(params.service.priceGHS)}` : null,
+    params.paidGHS ? `PAID IN FULL: ${formatPrice(params.paidGHS)}` : null,
     "",
     "Please confirm, or suggest another time.",
   ]

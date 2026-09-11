@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findByRef, markDepositPaid } from "@/lib/bookings";
+import { servicePrice } from "@/lib/constants";
 import { getService } from "@/lib/availability";
 import { isPaidInFull, paymentsConfigured, verifyWebhookSignature } from "@/lib/paystack";
 
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
         reference: event.data.reference ?? "",
         metadata: event.data.metadata,
       },
-      service.priceGHS
+      servicePrice(service, booking.optionId)
     );
 
     // Idempotent, so this racing the callback page is harmless. The booking

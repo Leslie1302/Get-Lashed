@@ -14,7 +14,8 @@
     "check:csp": "node scripts/check-csp.mjs",
     "db:setup": "node --env-file-if-exists=.env.local scripts/db-setup.mjs",
     "check:admin": "node scripts/check-admin-guard.mjs",
-    "check:payment": "node scripts/check-payment.mjs"
+    "check:payment": "node scripts/check-payment.mjs",
+    "check:menu": "node scripts/check-menu.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.35",

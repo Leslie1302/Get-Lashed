@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { availableSlots, getService, isValidDate } from "@/lib/availability";
 import { databaseConfigured } from "@/lib/db";
 
-/** GET /api/book/slots?service=gel-manicure&date=2026-09-10 */
+/** GET /api/book/slots?service=biab-natural&date=2026-09-10 */
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const date = params.get("date") ?? "";

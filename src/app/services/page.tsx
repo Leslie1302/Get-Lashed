@@ -5,6 +5,8 @@ import {
   PHOTOS,
   SERVICE_CATEGORIES,
   SERVICES,
+  serviceChoices,
+  servicePrice,
   type ServiceCategory,
 } from "@/lib/constants";
 import { formatDuration, formatPrice } from "@/lib/format";
@@ -16,7 +18,7 @@ export const metadata: Metadata = {
 const CATEGORY_BG: Record<ServiceCategory, string> = {
   nails: "bg-sand/60",
   lashes: "bg-linen",
-  pedimani: "bg-blush/50",
+  pedicure: "bg-blush/50",
 };
 
 export default function ServicesPage() {
@@ -77,7 +79,23 @@ export default function ServicesPage() {
                     <div className="flex items-baseline justify-between gap-3">
                       <h3 className="font-display text-xl font-medium">{service.name}</h3>
                       <p className="whitespace-nowrap font-bold text-espresso">
-                        {formatPrice(service.priceGHS)}
+                        {service.options ? (
+                          <>
+                            {formatPrice(service.priceGHS)}
+                            <span className="font-normal text-cocoa">
+                              –
+                              {formatPrice(
+                                Math.max(
+                                  ...serviceChoices(service).map((c) =>
+                                    servicePrice(service, c.id)
+                                  )
+                                )
+                              )}
+                            </span>
+                          </>
+                        ) : (
+                          formatPrice(service.priceGHS)
+                        )}
                       </p>
                     </div>
                     <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-mocha">
@@ -86,6 +104,18 @@ export default function ServicesPage() {
                     <p className="mt-3 text-sm leading-relaxed text-cocoa">
                       {service.description}
                     </p>
+                    {service.priceNote && (
+                      <p className="mt-2 text-xs italic text-mocha">{service.priceNote}</p>
+                    )}
+                    {service.options && (
+                      <ul className="mt-3 grid gap-1 text-xs text-mocha">
+                        {serviceChoices(service)
+                          .filter((c) => c.addGHS > 0)
+                          .map((c) => (
+                            <li key={c.id}>+ {c.label}</li>
+                          ))}
+                      </ul>
+                    )}
                     <Link
                       href={`/book?service=${service.id}`}
                       className="mt-6 inline-flex h-11 items-center justify-center rounded-md border-2 border-espresso px-6 text-sm font-semibold text-espresso transition-colors hover:bg-espresso hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terracotta"
