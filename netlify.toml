@@ -1,0 +1,16 @@
+# Netlify picks up the Next.js Runtime on its own; this file only pins the
+# things that bite when they drift.
+#
+# No [[headers]] blocks here on purpose. The CSP and the rest of the security
+# headers are set in next.config.ts, which the Next.js Runtime honours. Adding
+# them here too would leave two copies to disagree with each other — and the
+# CSP is one line away from making the whole site non-interactive (see the
+# comment in next.config.ts).
+
+[build]
+  command = "npm run build"
+
+[build.environment]
+  # Next 16 needs 20.9+. Pinned so a change to Netlify's default can't move it
+  # underneath us.
+  NODE_VERSION = "22"

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { adminSession } from "@/lib/admin-guard";
 import { databaseConfigured } from "@/lib/db";
 import {
   dateOverrides,
@@ -23,6 +25,10 @@ export const dynamic = "force-dynamic";
 const DAYS_AHEAD = 60;
 
 export default async function AdminPage() {
+  // Also enforced in proxy.ts. Repeated here so the page cannot be served
+  // unguarded if the host skips middleware — see lib/admin-guard.ts.
+  if (!(await adminSession())) redirect("/admin/login");
+
   let pending: Booking[] = [];
   let diary: Booking[] = [];
   let hours: Record<string, DayHours | null> = fallbackHours();

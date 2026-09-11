@@ -5,7 +5,7 @@ today without any of it: each integration degrades to a clear message and the
 WhatsApp fallback rather than breaking.
 
 **Never paste a secret key into a chat.** Keys go straight into `.env.local`
-locally and into Vercel's environment variables in production.
+locally and into Netlify's environment variables in production.
 
 ---
 
@@ -46,12 +46,13 @@ minimum notice for a booking, and how far ahead people may book.
 Bookings and her opening hours live in Postgres. There is no Google account
 involved and nothing to copy by hand.
 
-1. Vercel → your project → **Storage** → **Create Database** → **Neon Postgres**
-   → connect it to this project. Vercel adds `DATABASE_URL` itself.
-2. Create the tables once. Locally:
+1. Create a free project at [neon.tech](https://neon.tech) — region Frankfurt
+   or London is closest to Accra. Copy the **pooled** connection string.
+2. Put it in Netlify as `DATABASE_URL` (Site configuration → Environment
+   variables), and in your local `.env.local` as the same name.
+3. Create the tables once:
 
    ```bash
-   npx vercel env pull .env.local
    npm run db:setup
    ```
 
@@ -88,7 +89,7 @@ alongside the rest of her day. It is read-only and one-way: the app is the
 schedule, her phone is a mirror. No Google account, no API, no sign-in.
 
 1. Generate a token: `openssl rand -hex 24`
-2. Put it in Vercel as `BOOKINGS_FEED_TOKEN`, redeploy.
+2. Put it in Netlify as `BOOKINGS_FEED_TOKEN`, redeploy.
 3. On her phone: Calendar → Add account → **Subscribed calendar**, and paste
    `https://<your-domain>/api/bookings-feed/<that token>.ics`
 
@@ -143,7 +144,14 @@ almost certainly carry most of the payments.
 npm run admin:hash -- "a real password"
 ```
 
-Copy both printed lines into `.env.local`. The password itself is never stored.
+Copy both printed lines into `.env.local`, and into Netlify. The password
+itself is never stored.
+
+**She does not need a Netlify account.** `/admin` is this app's own login — she
+opens `https://<your-domain>/admin` in any browser and types the password. The
+Netlify account is only for whoever deploys the site, so a one-seat plan is no
+obstacle to her running her own diary. If she should have a different password
+from yours, that's a second deployment, not a second seat — one hash per site.
 
 ---
 
@@ -151,7 +159,7 @@ Copy both printed lines into `.env.local`. The password itself is never stored.
 
 1. **Business details and services** — no accounts needed, and the site stops
    telling visitors things that aren't true.
-2. **The database** — two clicks in Vercel plus one command, and booking works.
+2. **The database** — a free Neon project plus one command, and booking works.
 3. **Cloudinary** — five minutes, and the portfolio is the most persuasive page
    on the site.
 4. **Paystack in test mode** — prove the flow before real money touches it.

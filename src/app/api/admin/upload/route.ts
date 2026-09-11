@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminSession } from "@/lib/admin-guard";
 import { createHash } from "node:crypto";
 import { CATEGORY_TAGS, type CategoryTag } from "@/lib/cloudinary-core";
 import { PORTFOLIO_FOLDER } from "@/lib/constants";
@@ -11,9 +12,13 @@ const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 /**
  * Signed upload. The browser posts the file here; this route signs the request
  * with the API secret and forwards it to Cloudinary. The secret never reaches
- * the client, and middleware has already checked the admin session.
+ * the client, and the admin session is checked here as well as in proxy.ts.
  */
 export async function POST(request: Request) {
+  if (!(await adminSession())) {
+    return NextResponse.json({ error: "Not authorised." }, { status: 401 });
+  }
+
   const cloud = process.env.CLOUDINARY_CLOUD_NAME;
   const apiKey = process.env.CLOUDINARY_API_KEY;
   const apiSecret = process.env.CLOUDINARY_API_SECRET;

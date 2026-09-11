@@ -1,7 +1,7 @@
 # Get Lashed — lashes, nails & pedi-mani
 
 Marketing and booking site for a nail and lash technician in Kweiman, Accra.
-Next.js 16 (App Router), TypeScript strict, Tailwind v4, deployed to Vercel.
+Next.js 16 (App Router), TypeScript strict, Tailwind v4, deployed to Netlify.
 
 **Bookings and opening hours live in our own Postgres** (Neon over HTTP).
 Portfolio images and their category metadata live in Cloudinary — Cloudinary
@@ -53,7 +53,7 @@ See `.env.example` for the full list and setup steps. In short:
 
 | Var | Purpose |
 | --- | --- |
-| `DATABASE_URL` | Neon Postgres — bookings and opening hours. Vercel sets it |
+| `DATABASE_URL` | Neon Postgres — bookings and opening hours |
 | `BOOKINGS_FEED_TOKEN` | Optional `.ics` feed of confirmed bookings for her phone |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Portfolio images |
 | `ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` | `/admin` login |
@@ -152,8 +152,8 @@ earlier check is advisory only.
 honeypot and submit-timing check in that route are load-bearing. Without them
 one script makes the owner's real schedule unusable.
 
-**Portfolio images go to Cloudinary, never `/public`.** Vercel's filesystem is
-read-only at runtime. Cloudinary tags are the category metadata store, so the
+**Portfolio images go to Cloudinary, never `/public`.** The filesystem is
+read-only at runtime on any serverless host. Cloudinary tags are the category metadata store, so the
 gallery needs no tables of its own. Don't add a JSON manifest as a substitute.
 
 **Admin uses a real server-side session.** `/admin` exposes client names, phone
@@ -183,12 +183,12 @@ for modals, Canvas 2D for AR.
   in inline `<script>` tags. A `script-src` without `'unsafe-inline'` (or a
   nonce) blocks them, React never hydrates, and every page renders perfectly
   while every button does nothing. Dev allows inline scripts, so this is
-  invisible locally and total on Vercel. `npm run check:csp` fails the build if
+  invisible locally and total in production. `npm run check:csp` fails the build if
   it comes back.
 - **`NEXT_PUBLIC_*` is baked in at build time, and `.env.local` is not
   deployed.** Setting `NEXT_PUBLIC_ENABLE_AR` on your own machine does nothing
-  for the deployed site — it has to be a Vercel environment variable, and
-  changing it needs a **redeploy**, not just a save. If `/try-on` 404s in
+  for the deployed site — it has to be set in Netlify, and changing it needs a
+  **redeploy**, not just a save. If `/try-on` 404s in
   production, that's why.
 - **CSP breaks MediaPipe.** WASM needs `script-src 'self' 'wasm-unsafe-eval'`.
   It's in `next.config.ts`. Re-test `/try-on` after touching that header.
@@ -210,17 +210,19 @@ for modals, Canvas 2D for AR.
 
 ## Deploy runbook
 
-1. **Database** — Vercel → Storage → Create Database → Neon Postgres → connect
-   it to the project. Vercel sets `DATABASE_URL` itself. Then create the tables
-   once: `npx vercel env pull .env.local && npm run db:setup`.
+1. **Database** — create a free project at [neon.tech](https://neon.tech), copy
+   the pooled connection string into `DATABASE_URL` (Netlify and `.env.local`),
+   then create the tables once: `npm run db:setup`.
 2. **Cloudinary** — create the account, note the cloud name, API key, secret.
 3. **Admin secrets** — `npm run admin:hash -- "a real password"`, keep both
    lines it prints.
-4. **Vercel** — import the repo and add every var from `.env.example`. Leave
-   `NEXT_PUBLIC_ENABLE_AR` unset for the first deploy.
-5. **Domain** — point DNS at Vercel, then set `NEXT_PUBLIC_SITE_URL` to the
+4. **Netlify** — import the repo (build command and publish directory come
+   from `netlify.toml`), then add every var from `.env.example` under Site
+   configuration → Environment variables. Leave `NEXT_PUBLIC_ENABLE_AR` unset
+   for the first deploy.
+5. **Domain** — point DNS at Netlify, then set `NEXT_PUBLIC_SITE_URL` to the
    real origin and redeploy so canonicals and the sitemap stop pointing at
-   `*.vercel.app`.
+   `*.netlify.app`.
 6. **Smoke test on the real deploy** — make a booking end to end, confirm it
    in `/admin`, and check the slot then greys out on `/book`; set her real
    opening hours; upload one photo and check it appears on `/portfolio`;
@@ -237,5 +239,5 @@ for modals, Canvas 2D for AR.
 | SMS reminders | WhatsApp confirmations prove insufficient. Hubtel or Arkesel over Twilio for Ghana. |
 | Self-service cancel / reschedule | WhatsApp cancellations become a burden. The booking ref is already a natural key for it. |
 | Multi-staff scheduling | A second technician joins. Real re-architecture — the one-booking-per-slot unique index does not survive it. |
-| Analytics | Traffic worth measuring exists. Vercel Analytics, one line. |
+| Analytics | Traffic worth measuring exists. Netlify Analytics, or Plausible. |
 | i18n | Expanding beyond an English-speaking market |

@@ -12,11 +12,9 @@ if (!url) {
       "",
       "  ✗ DATABASE_URL is not set.",
       "",
-      "    In Vercel: Storage → Create Database → Neon Postgres → connect it to",
-      "    this project. Vercel injects DATABASE_URL automatically.",
-      "",
-      "    To run this locally, pull the variable down first:",
-      "      npx vercel env pull .env.local",
+      "    Create a free project at neon.tech, copy the POOLED connection",
+      "    string, and set it as DATABASE_URL — in .env.local to run this",
+      "    locally, and in Netlify for the deployed site.",
       "",
     ].join("\n")
   );

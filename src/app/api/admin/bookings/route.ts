@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server";
+import { adminSession } from "@/lib/admin-guard";
 import { getService } from "@/lib/availability";
 import { setStatus, type BookingStatus } from "@/lib/bookings";
 import { formatHours } from "@/lib/format";
 import { decisionMessage } from "@/lib/booking-message";
 
 /**
- * Confirm or decline one request. Behind the admin session — proxy.ts has
- * already checked it before this handler runs.
+ * Confirm or decline one request. Behind the admin session, checked here as
+ * well as in proxy.ts — see lib/admin-guard.ts for why both.
  *
  * Confirming greys the slot out for everyone else; declining frees it
  * immediately, because the unique index that reserves a slot only counts
  * pending and confirmed rows.
  */
 export async function POST(request: Request) {
+  if (!(await adminSession())) {
+    return NextResponse.json({ error: "Not authorised." }, { status: 401 });
+  }
+
   const body = (await request.json().catch(() => ({}))) as {
     id?: unknown;
     status?: unknown;

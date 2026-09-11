@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminSession } from "@/lib/admin-guard";
 import { clearDateOverride, setDateOverride, setWeeklyHours } from "@/lib/bookings";
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -12,9 +13,13 @@ interface DayInput {
 
 /**
  * Save the studio's opening hours, or a one-off change to a single date.
- * Behind the admin session, checked in proxy.ts.
+ * Behind the admin session, checked here as well as in proxy.ts.
  */
 export async function POST(request: Request) {
+  if (!(await adminSession())) {
+    return NextResponse.json({ error: "Not authorised." }, { status: 401 });
+  }
+
   const body = (await request.json().catch(() => ({}))) as {
     week?: DayInput[];
     override?: { date?: unknown; opens?: unknown; closes?: unknown; note?: unknown };
