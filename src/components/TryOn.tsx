@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LASH_DESIGNS,
+  nailServiceId,
   NAIL_DESIGNS,
   paintNail,
   swatchStyle,
@@ -589,6 +592,9 @@ export default function TryOn() {
                     style={swatchStyle(d)}
                   />
                   {d.name}
+                  {d.extra && (
+                    <span className="text-xs font-normal text-mocha">+GH₵20–30</span>
+                  )}
                 </button>
               ))
             : LASH_DESIGNS.map((d) => (
@@ -610,7 +616,37 @@ export default function TryOn() {
                 </button>
               ))}
         </div>
+
+        {/* The whole point of the try-on. Deep-links to /book with the matching
+            service already selected, so the look someone just liked is one tap
+            from being the thing they book. */}
+        <BookThisLook
+          href={`/book?service=${
+            mode === "nails" ? nailServiceId(nailLength.id) : lash.serviceId
+          }`}
+          what={
+            mode === "nails"
+              ? `${nailLength.name === "Natural" ? "BIAB on natural nails" : `${nailLength.name.toLowerCase()} ${shape.name.toLowerCase()} set`} in ${nail.name}`
+              : `${lash.name} lashes`
+          }
+        />
       </div>
+    </div>
+  );
+}
+
+function BookThisLook({ href, what }: { href: string; what: string }) {
+  return (
+    <div className="mt-6 flex flex-col gap-3 rounded-xl border border-sand bg-linen/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-cocoa">
+        Liking <span className="font-semibold text-espresso">{what}</span>?
+      </p>
+      <Link
+        href={href}
+        className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-terracotta px-6 text-sm font-semibold text-paper hover:bg-clay"
+      >
+        Book this look
+      </Link>
     </div>
   );
 }

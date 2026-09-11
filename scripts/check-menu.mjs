@@ -91,4 +91,18 @@ for (const c of refill.options.choices) {
   );
 }
 
-console.log(`Menu: ${SERVICES.length} services, every price positive, every quoted figure matches its total, refills are exactly half.`);
+// The try-on's "Book this look" deep-links by service id. A typo there is
+// invisible: /book just ignores an unknown ?service= and shows an empty form,
+// so the look someone picked silently fails to carry over.
+const designs = readFileSync("src/lib/designs.ts", "utf8");
+const referenced = [
+  ...[...designs.matchAll(/serviceId: "([^"]+)"/g)].map((m) => m[1]),
+  // nailServiceId() builds these from the length ids in ar-geometry.
+  "biab-natural",
+  ...["short", "medium", "long"].map((l) => `${l}-acrylic-french`),
+];
+for (const id of referenced) {
+  assert.ok(ids.has(id), `try-on links to "${id}", which is not a service`);
+}
+
+console.log(`Menu: ${SERVICES.length} services, every price positive, every quoted figure matches its total, refills are exactly half, ${referenced.length} try-on links resolve.`);

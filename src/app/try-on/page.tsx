@@ -43,9 +43,11 @@ export default function TryOnPage() {
 
       <p className="mt-10 text-sm leading-relaxed text-mocha">
         This is a preview, and the fit is approximate — it&rsquo;s meant for picking a colour,
-        not judging a shape. Happy with one?{" "}
-        <Link href="/book" className="font-semibold text-terracotta underline">
-          Book it in
+        not judging a shape. Every finish and lash style here is one the studio actually
+        offers, so &ldquo;Book this look&rdquo; takes you straight to that service with it
+        already selected. Prices are on the{" "}
+        <Link href="/services" className="font-semibold text-terracotta underline">
+          service list
         </Link>
         .
       </p>

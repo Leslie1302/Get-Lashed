@@ -18,6 +18,12 @@ export interface NailDesign {
   image?: string;
   /** Optional french tip painted over the colour or image. */
   tip?: string;
+  /**
+   * True for the patterned finishes, which are the paid "extra nail design"
+   * add-on rather than a plain colour. Shown on the swatch so nobody picks a
+   * look here and meets a price they weren't expecting at checkout.
+   */
+  extra?: boolean;
 }
 
 export interface LashDesign {
@@ -26,29 +32,57 @@ export interface LashDesign {
   color: string;
   /** Length multiplier: natural < volume < dramatic. */
   flair: 1 | 2 | 3;
+  /** The service this look books — id from SERVICES. */
+  serviceId: string;
 }
 
+// Ordered to match the menu: the BIAB and French finishes she actually sells
+// come first, then plain gel colours, then the patterned designs that carry
+// the extra-design charge.
 export const NAIL_DESIGNS: NailDesign[] = [
+  { id: "biab-natural", name: "BIAB Natural", color: "#edd9cd" },
+  { id: "french", name: "French Tips", color: "#e9ceb5", tip: "#fdf6f2" },
   { id: "classic", name: "Classic Red", color: "#b03052" },
   { id: "bubblegum", name: "Bubblegum", color: "#f2a0bd" },
   { id: "midnight", name: "Midnight", color: "#2b2b45" },
-  { id: "nude-french", name: "Nude French", color: "#e9ceb5", tip: "#fdf6f2" },
-  { id: "gold-glitter", name: "Gold Glitter", image: "/designs/gold-glitter.jpg" },
-  { id: "white-marble", name: "White Marble", image: "/designs/white-marble.jpg" },
-  { id: "leopard", name: "Leopard", image: "/designs/leopard.jpg" },
-  { id: "chrome", name: "Chrome", image: "/designs/chrome.jpg" },
-  { id: "midnight-shimmer", name: "Midnight Shimmer", image: "/designs/midnight-shimmer.jpg" },
-  { id: "rose-ombre", name: "Rose Ombré", image: "/designs/rose-ombre.jpg" },
+  { id: "gold-glitter", name: "Gold Glitter", image: "/designs/gold-glitter.jpg", extra: true },
+  { id: "white-marble", name: "White Marble", image: "/designs/white-marble.jpg", extra: true },
+  { id: "leopard", name: "Leopard", image: "/designs/leopard.jpg", extra: true },
+  { id: "chrome", name: "Chrome", image: "/designs/chrome.jpg", extra: true },
+  {
+    id: "midnight-shimmer",
+    name: "Midnight Shimmer",
+    image: "/designs/midnight-shimmer.jpg",
+    extra: true,
+  },
+  { id: "rose-ombre", name: "Rose Ombré", image: "/designs/rose-ombre.jpg", extra: true },
 ];
 
-/** Lashes are a thin fill along the lash line — a texture would never read. */
+/**
+ * Which service a nail look books. Length decides it: a natural-length set is
+ * BIAB on your own nails, anything longer is the acrylic set of that length.
+ *
+ * Kept here rather than on NAIL_LENGTHS so ar-geometry stays pure maths with
+ * no idea the price list exists.
+ */
+export function nailServiceId(lengthId: string): string {
+  return lengthId === "natural" ? "biab-natural" : `${lengthId}-acrylic-french`;
+}
+
+/**
+ * Lashes are a thin fill along the lash line — a texture would never read, so
+ * these differ by length and density rather than colour.
+ *
+ * One entry per lash set on the menu, and nothing else. The previous list had
+ * Violet Haze, Mocha and Soft Brown, which the studio does not offer: letting
+ * someone fall in love with a look they cannot book is worse than offering
+ * fewer.
+ */
 export const LASH_DESIGNS: LashDesign[] = [
-  { id: "natural", name: "Natural", color: "#15130f", flair: 1 },
-  { id: "classic-black", name: "Classic", color: "#0d0d0d", flair: 2 },
-  { id: "light-brown", name: "Soft Brown", color: "#5b4630", flair: 1 },
-  { id: "dramatic", name: "Dramatic", color: "#000000", flair: 3 },
-  { id: "violet", name: "Violet Haze", color: "#3d2b5e", flair: 2 },
-  { id: "mocha", name: "Mocha", color: "#43301f", flair: 2 },
+  { id: "classic", name: "Classic", color: "#15130f", flair: 1, serviceId: "classic-lashes" },
+  { id: "hybrid", name: "Hybrid", color: "#0d0d0d", flair: 2, serviceId: "hybrid-lashes" },
+  { id: "volume", name: "Volume", color: "#000000", flair: 3, serviceId: "volume-lashes" },
+  { id: "custom", name: "Custom", color: "#000000", flair: 3, serviceId: "custom-lashes" },
 ];
 
 /** CSS for the picker swatch, so a button shows the pattern it will paint. */

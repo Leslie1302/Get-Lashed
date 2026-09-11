@@ -202,7 +202,15 @@ export const SERVICES: Service[] = [
     durationMins: 60, // PROVISIONAL
     description:
       "Custom-made stick-on nails based on your preferred shape, length and design.",
-    priceNote: "GH₵100–GH₵200 depending on shape, length and design.",
+    options: {
+      label: "Choose your finish",
+      required: true,
+      choices: [
+        { id: "plain-gel", label: "Plain gel colour — GH₵100", addGHS: 0 },
+        { id: "french", label: "French tips — GH₵150", addGHS: 50 },
+        { id: "french-design", label: "French tips with extra design — GH₵200", addGHS: 100 },
+      ],
+    },
   },
   {
     id: "soak-off",
