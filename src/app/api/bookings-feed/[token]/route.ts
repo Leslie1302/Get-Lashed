@@ -8,6 +8,12 @@ import { databaseConfigured } from "@/lib/db";
  * reminders in the phone calendar she already uses. Read-only and one-way: the
  * app is the schedule, this is a mirror of it.
  *
+ * NOT Google Calendar. Nothing here talks to Google, there is no account to
+ * connect and no API key. This app publishes a standard .ics file; any calendar
+ * app (iOS, Android, Outlook) can subscribe to it. The whole thing is optional:
+ * leave BOOKINGS_FEED_TOKEN unset and the endpoint 404s, and /admin still shows
+ * every booking.
+ *
  * The URL is the credential — anyone holding it sees client names and phone
  * numbers — so it must be a long random string and never linked publicly.
  * Generate one with:  openssl rand -hex 24
@@ -15,7 +21,7 @@ import { databaseConfigured } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 function tokenMatches(given: string): boolean {
-  const expected = process.env.CALENDAR_FEED_TOKEN;
+  const expected = process.env.BOOKINGS_FEED_TOKEN;
   // A short token would be brute-forceable against an unauthenticated endpoint.
   if (!expected || expected.length < 24) return false;
   const a = Buffer.from(given);

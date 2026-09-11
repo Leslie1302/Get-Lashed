@@ -53,10 +53,16 @@ const nextConfig: NextConfig = {
   // silently drags the root up there — which changes module resolution and
   // makes it watch far more of the filesystem than it should.
   turbopack: { root: __dirname },
-  images: {
-    loader: "custom",
-    loaderFile: "./src/lib/cloudinary-loader.ts",
-  },
+  // No global image loader on purpose. Setting `loader: "custom"` here applied
+  // the Cloudinary loader to EVERY image, including the local photos under
+  // /public — which it cannot resize, so it returned the same URL at every
+  // width. Next spotted that ("loader property that does not implement width")
+  // and, worse, those photos silently lost all optimisation.
+  //
+  // The Cloudinary loader is now passed per-image, in the one component that
+  // shows Cloudinary images. Local photos go through Next's own optimiser and
+  // get properly resized AVIF/WebP.
+  images: {},
   async headers() {
     return [
       {

@@ -3,7 +3,10 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PortfolioItem } from "@/lib/cloudinary";
-import { blurCloudinaryUrl, sizedCloudinaryUrl } from "@/lib/cloudinary-loader";
+import cloudinaryLoader, {
+  blurCloudinaryUrl,
+  sizedCloudinaryUrl,
+} from "@/lib/cloudinary-loader";
 
 export default function PortfolioLightbox({ items }: { items: PortfolioItem[] }) {
   const [index, setIndex] = useState<number | null>(null);
@@ -48,6 +51,10 @@ export default function PortfolioLightbox({ items }: { items: PortfolioItem[] })
             className="group relative mb-4 block w-full break-inside-avoid cursor-zoom-in overflow-hidden rounded-xl bg-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terracotta"
           >
             <Image
+              // Scoped here rather than set globally in next.config: these are
+              // the only Cloudinary images on the site, and a global loader
+              // breaks optimisation for every local photo.
+              loader={cloudinaryLoader}
               src={img.url}
               alt={img.caption || `${img.category} work`}
               width={img.width}

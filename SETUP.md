@@ -76,15 +76,21 @@ Google shows in search.
 Nothing is lost if the client never taps send — the request is already saved
 and shows in `/admin` regardless.
 
-## 4. Her phone calendar
+## 4. Her phone calendar — optional, and not Google
 
-Confirmed bookings are published as a calendar feed she subscribes to once, so
-they appear in her normal phone calendar with reminders.
+**Skip this entirely if you want.** Booking works without it; `/admin` is the
+schedule either way.
+
+This has nothing to do with Google Calendar. The app publishes her confirmed
+bookings as a standard `.ics` file, and any phone calendar — iPhone, Android,
+Outlook — can subscribe to that link so appointments and reminders show up
+alongside the rest of her day. It is read-only and one-way: the app is the
+schedule, her phone is a mirror. No Google account, no API, no sign-in.
 
 1. Generate a token: `openssl rand -hex 24`
-2. Put it in Vercel as `CALENDAR_FEED_TOKEN`, redeploy.
+2. Put it in Vercel as `BOOKINGS_FEED_TOKEN`, redeploy.
 3. On her phone: Calendar → Add account → **Subscribed calendar**, and paste
-   `https://<your-domain>/api/calendar/<that token>.ics`
+   `https://<your-domain>/api/bookings-feed/<that token>.ics`
 
 **That URL is the password.** Anyone with it sees client names and phone
 numbers, so don't post it anywhere. Change the token to revoke it.

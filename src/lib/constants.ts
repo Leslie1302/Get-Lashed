@@ -211,9 +211,6 @@ export const SCHEDULE = {
    */
   blackoutDates: [] as string[],
 } as const;
-/** Google Calendar id the bookings land in. Set GOOGLE_CALENDAR_ID to override. */
-export const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID ?? "primary";
-
 export const ADMIN_COOKIE = "gl_admin";
 export const ADMIN_SESSION_HOURS = 8;
 

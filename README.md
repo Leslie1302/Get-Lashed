@@ -1,10 +1,11 @@
-# Glow Studio Accra — nails & lashes
+# Get Lashed — lashes, nails & pedi-mani
 
-Marketing and booking site for a nail and lash technician in Accra. Next.js 16
-(App Router), TypeScript strict, Tailwind v4, deployed to Vercel.
+Marketing and booking site for a nail and lash technician in Kweiman, Accra.
+Next.js 16 (App Router), TypeScript strict, Tailwind v4, deployed to Vercel.
 
-**No database.** Bookings live in Google Calendar; portfolio images and their
-category metadata live in Cloudinary.
+**Bookings and opening hours live in our own Postgres** (Neon over HTTP).
+Portfolio images and their category metadata live in Cloudinary — Cloudinary
+tags are the only store the gallery has.
 
 ## Pages
 
@@ -13,10 +14,10 @@ category metadata live in Cloudinary.
 | `/` | Home. Online-booking and WhatsApp CTAs carry equal weight. |
 | `/services` | Services and prices, from `src/lib/constants.ts` |
 | `/portfolio` | Cloudinary gallery, category filter, `<dialog>` lightbox |
-| `/book` | Service → date → slot → details, straight into Google Calendar |
+| `/book` | Service → date → slot → details, held in the database as *pending* |
 | `/about` | About, hours, map |
 | `/try-on` | AR try-on. **Beta, off by default** — set `NEXT_PUBLIC_ENABLE_AR=true` |
-| `/admin` | Session-gated: upcoming bookings and portfolio upload |
+| `/admin` | Session-gated: confirm/decline requests, diary, opening hours, portfolio upload |
 
 ## Running it
 
@@ -52,7 +53,8 @@ See `.env.example` for the full list and setup steps. In short:
 
 | Var | Purpose |
 | --- | --- |
-| `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_CALENDAR_ID` | Calendar access for bookings |
+| `DATABASE_URL` | Neon Postgres — bookings and opening hours. Vercel sets it |
+| `BOOKINGS_FEED_TOKEN` | Optional `.ics` feed of confirmed bookings for her phone |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Portfolio images |
 | `ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` | `/admin` login |
 | `NEXT_PUBLIC_ENABLE_AR` | `"true"` turns on `/try-on` |
@@ -118,34 +120,41 @@ on camera.
 
 Each of these exists because the obvious alternative fails in a specific way.
 
-**Calendar auth is a service account, never OAuth2.** A refresh token issued
-against a consent screen in Testing status expires after 7 days, so an
-OAuth-based booking flow dies quietly the week after launch. The service
-account authenticates with a key pair and the calendar is shared with its
-`client_email`. There is no refresh flow in this codebase and none should be
-added. `src/lib/google-calendar.ts` signs its own JWT with `node:crypto` — the
-`googleapis` package is 50 MB of surface area for two REST calls.
+**The schedule is our own database, not Google Calendar.** Bookings and her
+opening hours live in Postgres (`bookings`, `opening_hours`, `date_overrides`).
+There is no Google account, no service account, no OAuth and no third-party API
+in the booking path — an outage or an expired credential at Google cannot take
+her diary offline, and client names and phone numbers never leave our own
+database. She sets her hours in `/admin`.
 
-**Double-booking is prevented by a deterministic event ID, not a lock.**
-`events.list` then `events.insert` is a check-then-act race. Instead the ID is
-derived from the slot start: `"bk" + Math.floor(startMs / 1000).toString(32)`
-(base32hex — Calendar IDs allow only `a`–`v` and `0`–`9`). A duplicate insert
-returns 409 from Google, which surfaces as "that slot was just taken".
-Cancelled event IDs can't be reused, so `freeEventId()` adds an `r1`/`r2`
-suffix — but only after confirming the existing event's status is `cancelled`,
-never past a live booking.
+`/api/bookings-feed/[token]` is the one calendar-shaped thing left, and it runs
+the other way: we *publish* a read-only `.ics` file so her phone can mirror
+confirmed bookings. It is optional and reads nothing.
+
+**Double-booking is prevented by the database, not by application code.** A
+partial unique index does it in one statement:
+
+```sql
+CREATE UNIQUE INDEX bookings_live_slot ON bookings (starts_at)
+  WHERE status IN ('pending', 'confirmed')
+```
+
+Check-then-insert is a race no matter how careful the code is; here the second
+concurrent insert simply fails with 23505, which surfaces as "that slot was
+just taken". Cancelling or declining a booking moves it out of those two
+statuses, which frees the slot automatically — no cleanup job.
 
 **Slot logic is re-derived server-side.** `POST /api/book` recomputes duration
 and end time from `serviceId` and re-runs the availability check. The client's
 earlier check is advisory only.
 
-**`/api/book` is an unauthenticated write to a live calendar.** The rate limit,
+**`/api/book` is an unauthenticated write to the live diary.** The rate limit,
 honeypot and submit-timing check in that route are load-bearing. Without them
 one script makes the owner's real schedule unusable.
 
 **Portfolio images go to Cloudinary, never `/public`.** Vercel's filesystem is
-read-only at runtime. Cloudinary tags are the category metadata store — that is
-why there's no database. Don't add a JSON manifest as a substitute.
+read-only at runtime. Cloudinary tags are the category metadata store, so the
+gallery needs no tables of its own. Don't add a JSON manifest as a substitute.
 
 **Admin uses a real server-side session.** `/admin` exposes client names, phone
 numbers and email addresses; under Ghana's Data Protection Act (Act 843) that's
@@ -157,9 +166,9 @@ httpOnly/secure/sameSite=strict cookie, verified in `src/proxy.ts` on every
 `face_mesh` and `camera_utils` are deprecated legacy solutions. Camera plumbing
 is `getUserMedia` plus `requestVideoFrameCallback`, no helper package.
 
-**All times are `Africa/Accra`.** Ghana is UTC+0 with no DST, but `timeZone` is
-still passed explicitly to every Calendar call. Server-local time is never
-trusted.
+**All times are `Africa/Accra`.** Ghana is UTC+0 with no DST, so a
+`YYYY-MM-DDTHH:MM:00Z` string is both the wall clock she reads and the instant
+stored. Every slot is derived from that, never from server-local time.
 
 **WhatsApp is a first-class booking channel.** For a salon in Accra it will
 likely out-convert the form, so it has equal visual weight on the home page and
@@ -201,22 +210,21 @@ for modals, Canvas 2D for AR.
 
 ## Deploy runbook
 
-1. **Google Cloud** — new project, enable the Calendar API, create a service
-   account, download a JSON key. In Google Calendar, share the studio calendar
-   with the service account's `client_email` as *Make changes to events*, and
-   copy the calendar ID from Settings → Integrate calendar.
+1. **Database** — Vercel → Storage → Create Database → Neon Postgres → connect
+   it to the project. Vercel sets `DATABASE_URL` itself. Then create the tables
+   once: `npx vercel env pull .env.local && npm run db:setup`.
 2. **Cloudinary** — create the account, note the cloud name, API key, secret.
 3. **Admin secrets** — `npm run admin:hash -- "a real password"`, keep both
    lines it prints.
-4. **Vercel** — import the repo, add every var from `.env.example` (paste the
-   service-account JSON on one line). Leave `NEXT_PUBLIC_ENABLE_AR` unset for
-   the first deploy.
+4. **Vercel** — import the repo and add every var from `.env.example`. Leave
+   `NEXT_PUBLIC_ENABLE_AR` unset for the first deploy.
 5. **Domain** — point DNS at Vercel, then set `NEXT_PUBLIC_SITE_URL` to the
    real origin and redeploy so canonicals and the sitemap stop pointing at
    `*.vercel.app`.
-6. **Smoke test on the real deploy** — make a booking end to end and confirm it
-   lands in the calendar; sign in to `/admin`; upload one photo and check it
-   appears on `/portfolio`; confirm `/admin` redirects when signed out.
+6. **Smoke test on the real deploy** — make a booking end to end, confirm it
+   in `/admin`, and check the slot then greys out on `/book`; set her real
+   opening hours; upload one photo and check it appears on `/portfolio`;
+   confirm `/admin` redirects when signed out.
 7. **AR last** — only after testing `/try-on` on a real midrange Android in
    ordinary indoor light. Set `NEXT_PUBLIC_ENABLE_AR=true`, redeploy, re-test
    the page (the CSP is the usual culprit).
@@ -225,10 +233,9 @@ for modals, Canvas 2D for AR.
 
 | Deferred | Add when |
 | --- | --- |
-| Database | Booking history, client records or repeat-visit tracking is needed |
 | Deposits / Mobile Money | No-shows start costing real money. Most likely first addition. |
-| SMS reminders | Calendar reminders prove insufficient. Hubtel or Arkesel over Twilio for Ghana. |
-| Self-service cancel / reschedule | WhatsApp cancellations become a burden |
-| Multi-staff scheduling | A second technician joins. Genuine re-architecture — the deterministic-event-ID scheme does not survive it. |
+| SMS reminders | WhatsApp confirmations prove insufficient. Hubtel or Arkesel over Twilio for Ghana. |
+| Self-service cancel / reschedule | WhatsApp cancellations become a burden. The booking ref is already a natural key for it. |
+| Multi-staff scheduling | A second technician joins. Real re-architecture — the one-booking-per-slot unique index does not survive it. |
 | Analytics | Traffic worth measuring exists. Vercel Analytics, one line. |
 | i18n | Expanding beyond an English-speaking market |
