@@ -1,5 +1,5 @@
 export const BUSINESS = {
-  name: "Get Lashed",
+  name: "Nailed.It",
   tagline: "Lashes, nails and pedicures — Kweiman, Accra",
   /** The number clients call. */
   phone: "+233 50 663 7726",

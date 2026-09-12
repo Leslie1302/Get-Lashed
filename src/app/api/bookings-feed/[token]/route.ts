@@ -55,7 +55,7 @@ export async function GET(
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Get Lashed//Bookings//EN",
+    "PRODID:-//Nailed.It//Bookings//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     `X-WR-CALNAME:${esc(BUSINESS.name)} bookings`,
@@ -69,7 +69,7 @@ export async function GET(
     const service = SERVICES.find((s) => s.id === b.serviceId);
     lines.push(
       "BEGIN:VEVENT",
-      `UID:${b.ref}@getlashed`,
+      `UID:${b.ref}@nailedit`,
       `DTSTAMP:${stamp(b.createdAt)}`,
       `DTSTART:${stamp(b.startsAt)}`,
       `DTEND:${stamp(b.endsAt)}`,

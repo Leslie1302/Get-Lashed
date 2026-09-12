@@ -1,4 +1,4 @@
-# Get Lashed — lashes, nails & pedi-mani
+# Nailed.It — nails, lashes & pedicures
 
 Marketing and booking site for a nail and lash technician in Kweiman, Accra.
 Next.js 16 (App Router), TypeScript strict, Tailwind v4, deployed to Netlify.
